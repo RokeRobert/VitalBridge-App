@@ -3,6 +3,7 @@ import 'package:vital_bridge/screens/alarma_screen.dart';
 import 'package:vital_bridge/screens/alerta_sos_cuidador_screen.dart';
 import 'package:vital_bridge/screens/horario_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
+import 'package:vital_bridge/services/alertas_service.dart';
 
 class PacienteScreen extends StatelessWidget {
   const PacienteScreen({super.key});
@@ -36,6 +37,12 @@ class PacienteScreen extends StatelessWidget {
             ),
             onPressed: () {
               Navigator.pop(context);
+              // Registrar la alerta en el servicio / backend
+              AlertasService.emitirAlertaSos(
+                idPaciente: '00000000-0000-0000-0000-000000000045',
+                motivo: 'Botón SOS presionado por Miguel Angel',
+              );
+
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: const Text('🚨 ¡Alerta SOS enviada con éxito a tus contactos de emergencia!'),

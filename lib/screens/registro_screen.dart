@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
+import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class RegistroScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -33,7 +35,9 @@ class _RegistroScreenState extends State<RegistroScreen> {
     super.dispose();
   }
 
-  void _registrarUsuario() {
+  Future<void> _registrarUsuario() async {
+    if (_isLoading) return;
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -48,31 +52,52 @@ class _RegistroScreenState extends State<RegistroScreen> {
       return;
     }
 
-    // Registro simulado exitoso
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                '¡Cuenta creada exitosamente! Bienvenido, ${_nombreController.text.trim()}.',
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(0xFF2C5E53),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
+    setState(() => _isLoading = true);
+
+    final res = await AuthService.registrarCuidador(
+      nombre: _nombreController.text.trim(),
+      apellidos: _apellidosController.text.trim(),
+      correo: _emailController.text.trim(),
+      telefono: _telefonoController.text.trim(),
+      password: _passwordController.text.trim(),
     );
 
-    // Redirige al panel del cuidador
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
-      (route) => false,
-    );
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (res['exito'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '¡Cuenta creada exitosamente! Bienvenido, ${_nombreController.text.trim()}.',
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: const Color(0xFF2C5E53),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+
+      // Redirige al panel del cuidador
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
+        (route) => false,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['mensaje'] ?? 'Error al registrar usuario'),
+          backgroundColor: AppColors.terracota,
+        ),
+      );
+    }
   }
 
   @override
@@ -634,15 +659,24 @@ class _RegistroScreenState extends State<RegistroScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  onPressed: _registrarUsuario,
-                  child: const Text(
-                    'Registrarse',
-                    style: TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
+                  onPressed: _isLoading ? null : _registrarUsuario,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Registrarse',
+                          style: TextStyle(
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 24),
 

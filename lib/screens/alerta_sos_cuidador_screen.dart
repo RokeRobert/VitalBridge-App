@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class AlertaSosCuidadorScreen extends StatefulWidget {
@@ -175,6 +176,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               elevation: 0,
             ),
             onPressed: () {
+              AlertasService.resolverAlerta(1, resolucion: 'Atendida');
               Navigator.pop(context); // Cierra diálogo
               Navigator.pop(context); // Cierra pantalla de alerta SOS y regresa al dashboard
               ScaffoldMessenger.of(context).showSnackBar(

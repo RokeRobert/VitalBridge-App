@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:vital_bridge/models/tratamiento_model.dart';
+import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class AgregarMedicamentoScreen extends StatefulWidget {
-  const AgregarMedicamentoScreen({super.key});
+  final String? idPaciente;
+  final String? nombrePaciente;
+
+  const AgregarMedicamentoScreen({
+    super.key,
+    this.idPaciente,
+    this.nombrePaciente,
+  });
 
   @override
   State<AgregarMedicamentoScreen> createState() => _AgregarMedicamentoScreenState();
@@ -139,7 +148,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
     return activos.join(', ');
   }
 
-  void _guardarMedicamento() {
+  Future<void> _guardarMedicamento() async {
     if (_formKey.currentState!.validate()) {
       if (!_todosLosDias && !_diasSemana.containsValue(true)) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +166,27 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
           : (_duracionSeleccionada == 'Fecha específica' && _fechaFinPersonalizada != null
               ? 'Hasta ${_fechaFinPersonalizada!.day}/${_fechaFinPersonalizada!.month}/${_fechaFinPersonalizada!.year}'
               : 'Por $_duracionSeleccionada');
+
+      // Registrar mediante el servicio de tratamientos
+      final nuevo = TratamientoModel(
+        id: DateTime.now().millisecondsSinceEpoch % 10000,
+        idPaciente: widget.idPaciente,
+        medicamento: _nombreController.text.trim(),
+        cantidad: double.tryParse(_dosisController.text.trim()) ?? 1.0,
+        unidadMedida: 'tableta',
+        frecuencia: dias,
+        fechaInicio: DateTime.now(),
+        fechaFinal: _esDePorVida ? null : _fechaFinPersonalizada,
+        indicaciones: _indicacionesController.text.trim().isNotEmpty
+            ? '${_indicacionesController.text.trim()} ($_momentoComida)'
+            : _momentoComida,
+        horarios: _horarios.map(_formatearHora).toList(),
+        presentacion: _tipoSeleccionado,
+      );
+
+      await TratamientosService.agregarTratamiento(nuevo);
+
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -210,17 +240,17 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: AppColors.lilaSuave.withValues(alpha: 0.3)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.person_pin_rounded, color: AppColors.moradoOscuro, size: 28),
-                      SizedBox(width: 12),
+                      const Icon(Icons.person_pin_rounded, color: AppColors.moradoOscuro, size: 28),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Asignar a: Miguel Angel Ramos',
-                              style: TextStyle(
+                              'Asignar a: ${widget.nombrePaciente ?? "Paciente"}',
+                              style: const TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.azulOscuro,

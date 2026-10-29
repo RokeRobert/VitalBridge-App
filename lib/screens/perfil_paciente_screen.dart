@@ -1,18 +1,29 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:vital_bridge/services/perfiles_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class PerfilPacienteScreen extends StatefulWidget {
+  final String? idPaciente;
+  final String? fotoInicial;
   final String nombreInicial;
   final String apellidosInicial;
   final String parentescoInicial;
   final String telefonoInicial;
+  final String tipoPacienteInicial;
+  final String tokenInicial;
 
   const PerfilPacienteScreen({
     super.key,
-    this.nombreInicial = 'Roberto',
-    this.apellidosInicial = 'Gómez',
-    this.parentescoInicial = 'Padre',
-    this.telefonoInicial = '+34 610 345 872',
+    this.idPaciente,
+    this.fotoInicial,
+    this.nombreInicial = '',
+    this.apellidosInicial = '',
+    this.parentescoInicial = 'Familiar',
+    this.telefonoInicial = '',
+    this.tipoPacienteInicial = 'Adulto Mayor',
+    this.tokenInicial = '',
   });
 
   @override
@@ -20,25 +31,55 @@ class PerfilPacienteScreen extends StatefulWidget {
 }
 
 class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
+  static const List<String> _opcionesParentesco = [
+    'Padre / Madre',
+    'Abuelo / Abuela',
+    'Esposo / Esposa',
+    'Tío / Tía',
+    'Hijo / Hija',
+    'Paciente a cargo',
+    'Otro familiar',
+  ];
+
   bool _editando = false;
+  String? _fotoUrl;
+  String? _savedFoto;
+  XFile? _nuevaFotoArchivo;
+  bool _subiendoFoto = false;
 
   late String _savedNombre;
   late String _savedApellidos;
   late String _savedParentesco;
   late String _savedTelefono;
+  late String _tipoPaciente;
+  late String _token;
+  late String _parentescoSeleccionado;
 
   late final TextEditingController _nombreController;
   late final TextEditingController _apellidosController;
   late final TextEditingController _parentescoController;
   late final TextEditingController _telefonoController;
 
+  List<String> get _opcionesParentescoValidas {
+    final list = List<String>.from(_opcionesParentesco);
+    if (!list.contains(_parentescoSeleccionado) && _parentescoSeleccionado.isNotEmpty) {
+      list.insert(0, _parentescoSeleccionado);
+    }
+    return list;
+  }
+
   @override
   void initState() {
     super.initState();
+    _fotoUrl = widget.fotoInicial;
+    _savedFoto = widget.fotoInicial;
     _savedNombre = widget.nombreInicial;
     _savedApellidos = widget.apellidosInicial;
-    _savedParentesco = widget.parentescoInicial;
+    _savedParentesco = widget.parentescoInicial.isNotEmpty ? widget.parentescoInicial : 'Padre / Madre';
+    _parentescoSeleccionado = _savedParentesco;
     _savedTelefono = widget.telefonoInicial;
+    _tipoPaciente = widget.tipoPacienteInicial;
+    _token = widget.tokenInicial;
 
     _nombreController = TextEditingController(text: _savedNombre);
     _apellidosController = TextEditingController(text: _savedApellidos);
@@ -59,8 +100,11 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
     setState(() {
       _nombreController.text = _savedNombre;
       _apellidosController.text = _savedApellidos;
+      _parentescoSeleccionado = _savedParentesco;
       _parentescoController.text = _savedParentesco;
       _telefonoController.text = _savedTelefono;
+      _nuevaFotoArchivo = null;
+      _fotoUrl = _savedFoto;
       _editando = false;
     });
     ScaffoldMessenger.of(context).showSnackBar(
@@ -108,7 +152,7 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
               Navigator.pop(context);
               _savedNombre = _nombreController.text.trim();
               _savedApellidos = _apellidosController.text.trim();
-              _savedParentesco = _parentescoController.text.trim();
+              _savedParentesco = _parentescoSeleccionado.trim();
               _savedTelefono = _telefonoController.text.trim();
               _guardarCambios();
             },
@@ -119,7 +163,74 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
     );
   }
 
-  void _guardarCambios() {
+  Future<void> _cambiarFotoPaciente() async {
+    if (!_editando) return;
+
+    final archivo = await PerfilesService.seleccionarFotoDeGaleria();
+    if (archivo == null) return;
+
+    setState(() {
+      _nuevaFotoArchivo = archivo;
+      _fotoUrl = archivo.path; // Previsualización local inmediata
+    });
+  }
+
+  Future<void> _guardarCambios() async {
+    setState(() => _subiendoFoto = true);
+
+    String? urlFinalFoto = _savedFoto;
+
+    // 1. Si seleccionó una nueva foto, subirla a Supabase Storage y a la BD
+    if (_nuevaFotoArchivo != null && widget.idPaciente != null && widget.idPaciente!.isNotEmpty) {
+      final resFoto = await PerfilesService.subirFoto(
+        archivo: _nuevaFotoArchivo!,
+        tipo: 'paciente',
+        id: widget.idPaciente!,
+      );
+      if (resFoto['exito'] == true && resFoto['urlFoto'] != null) {
+        urlFinalFoto = resFoto['urlFoto'];
+        _savedFoto = urlFinalFoto;
+        _fotoUrl = urlFinalFoto;
+      }
+    }
+
+    // 2. Actualizar paciente en backend
+    if (widget.idPaciente != null && widget.idPaciente!.isNotEmpty) {
+      final res = await PerfilesService.actualizarPaciente(
+        widget.idPaciente!,
+        nombre: _nombreController.text.trim(),
+        apellidos: _apellidosController.text.trim(),
+        telefono: _telefonoController.text.trim(),
+        parentesco: _parentescoSeleccionado.trim(),
+        foto: urlFinalFoto,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _nuevaFotoArchivo = null;
+        _subiendoFoto = false;
+      });
+
+      if (res['exito'] != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['mensaje'] ?? 'Error al actualizar el paciente'),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+        return;
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          _nuevaFotoArchivo = null;
+          _subiendoFoto = false;
+        });
+      }
+    }
+
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -142,8 +253,9 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
     Navigator.pop(context, {
       'nombre': _nombreController.text.trim(),
       'apellidos': _apellidosController.text.trim(),
-      'parentesco': _parentescoController.text.trim(),
+      'parentesco': _parentescoSeleccionado.trim(),
       'telefono': _telefonoController.text.trim(),
+      'foto': _fotoUrl,
     });
   }
 
@@ -220,56 +332,85 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Avatar del paciente con badge de destello / estrella
+                      // Avatar del paciente con badge de cámara
                       Stack(
                         clipBehavior: Clip.none,
                         alignment: Alignment.center,
                         children: [
-                          Container(
-                            width: 96,
-                            height: 96,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3.5),
-                              color: const Color(0xFFC7EADB),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                            ),
-                            child: const ClipOval(
-                              child: Icon(
-                                Icons.person_rounded,
-                                size: 68,
-                                color: Color(0xFF558273),
-                              ),
-                            ),
-                          ),
-                          // Badge pequeño inferior derecho
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
+                          GestureDetector(
+                            onTap: (_editando && !_subiendoFoto) ? _cambiarFotoPaciente : null,
                             child: Container(
-                              width: 30,
-                              height: 30,
+                              width: 96,
+                              height: 96,
                               decoration: BoxDecoration(
-                                color: Colors.white,
                                 shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 3.5),
+                                color: const Color(0xFFC7EADB),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.1),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
+                                    color: Colors.black.withValues(alpha: 0.08),
+                                    blurRadius: 14,
+                                    offset: const Offset(0, 6),
                                   ),
                                 ],
                               ),
-                              child: const Icon(
-                                Icons.auto_awesome,
-                                size: 16,
-                                color: AppColors.moradoOscuro,
+                              clipBehavior: Clip.antiAlias,
+                              child: _subiendoFoto
+                                  ? const Center(
+                                      child: CircularProgressIndicator(color: AppColors.turquesa),
+                                    )
+                                  : (_fotoUrl != null && _fotoUrl!.isNotEmpty)
+                                      ? (_fotoUrl!.startsWith('http')
+                                          ? Image.network(
+                                              _fotoUrl!,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => const Center(
+                                                child: Icon(Icons.person_rounded, size: 68, color: Color(0xFF558273)),
+                                              ),
+                                            )
+                                          : Image.file(
+                                              File(_fotoUrl!),
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => const Center(
+                                                child: Icon(Icons.person_rounded, size: 68, color: Color(0xFF558273)),
+                                              ),
+                                            ))
+                                      : const Center(
+                                          child: Icon(
+                                            Icons.person_rounded,
+                                            size: 68,
+                                            color: Color(0xFF558273),
+                                          ),
+                                        ),
+                            ),
+                          ),
+                          // Badge pequeño inferior derecho (Cámara - solo visible al editar)
+                          if (_editando)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: _subiendoFoto ? null : _cambiarFotoPaciente,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: BoxDecoration(
+                                  color: AppColors.moradoOscuro,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.15),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  size: 15,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
@@ -289,16 +430,16 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Badge de rol: Adulto Mayor · ID: 0045
+                      // Badge de rol dinámico
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
                           color: const Color(0xFFCDEFE3),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Text(
-                          'Adulto Mayor · ID: 0045',
-                          style: TextStyle(
+                        child: Text(
+                          '$_tipoPaciente${_token.isNotEmpty ? " · Código: $_token" : ""}',
+                          style: const TextStyle(
                             fontSize: 12.5,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF1E5246),
@@ -426,28 +567,76 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextField(
-                    controller: _parentescoController,
-                    readOnly: !_editando,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.family_restroom_rounded, color: AppColors.moradoOscuro, size: 20),
-                      hintText: 'Ej. Padre, Madre, Abuelo, Tío...',
-                      filled: true,
-                      fillColor: _editando ? Colors.white : const Color(0xFFF8FAFC),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                      enabledBorder: OutlineInputBorder(
+                  if (!_editando)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(
-                          color: _editando ? const Color(0xFFCBD5E1) : const Color(0xFFE2E8F0),
-                          width: 1.4,
+                        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.4),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.family_restroom_rounded, color: AppColors.moradoOscuro, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              _parentescoSeleccionado,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                color: Color(0xFF1E293B),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFCBD5E1), width: 1.4),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _opcionesParentescoValidas.contains(_parentescoSeleccionado)
+                              ? _parentescoSeleccionado
+                              : _opcionesParentescoValidas.first,
+                          isExpanded: true,
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.moradoOscuro),
+                          items: _opcionesParentescoValidas.map((opc) {
+                            return DropdownMenuItem<String>(
+                              value: opc,
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.family_restroom_rounded, color: AppColors.moradoOscuro, size: 18),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    opc,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.azulOscuro,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _parentescoSeleccionado = val;
+                                _parentescoController.text = val;
+                              });
+                            }
+                          },
                         ),
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
-                      ),
                     ),
-                  ),
                   const SizedBox(height: 16),
 
                   // Campo Teléfono

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/screens/registro_screen.dart';
+import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -16,6 +18,24 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _tokenController = TextEditingController(text: 'VB-8492');
   bool _obscurePassword = true;
+  bool _cargandoCuidador = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarCredencialesGuardadas();
+  }
+
+  Future<void> _cargarCredencialesGuardadas() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString('usuario_correo');
+    if (savedEmail != null && savedEmail.isNotEmpty) {
+      _emailController.text = savedEmail;
+    } else {
+      _emailController.text = 'maria.cuidadora@vitalbridge.com';
+    }
+    _passwordController.text = 'VitalBridge2026!';
+  }
 
   @override
   void dispose() {
@@ -25,11 +45,53 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // 1. Flujo Cuidador: Iniciar sesión pasa directo al Dashboard del Cuidador
-  void _iniciarSesionCuidador() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
+  // 1. Flujo Cuidador: Iniciar sesión usando AuthService
+  Future<void> _iniciarSesionCuidador() async {
+    if (_cargandoCuidador) return;
+
+    final correo = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (correo.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Por favor ingresa tu correo y contraseña.'),
+          backgroundColor: AppColors.terracota,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _cargandoCuidador = true);
+
+    final res = await AuthService.loginCuidador(
+      correo: correo,
+      password: password,
     );
+
+    if (!mounted) return;
+    setState(() => _cargandoCuidador = false);
+
+    if (res['exito'] == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['modoSimulacion'] == true
+              ? '✅ Sesión iniciada (Modo desarrollo / offline)'
+              : '✅ Bienvenido a VitalBridge'),
+          backgroundColor: const Color(0xFF336C60),
+        ),
+      );
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res['mensaje'] ?? 'Error al iniciar sesión'),
+          backgroundColor: AppColors.terracota,
+        ),
+      );
+    }
   }
 
   // 2. Flujo Paciente: Ventana modal para vincular mediante Token o QR
@@ -41,170 +103,217 @@ class _LoginScreenState extends State<LoginScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          left: 24,
-          right: 24,
-          top: 24,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 28,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Barra de agarre superior
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
+      builder: (modalContext) {
+        bool cargandoToken = false;
 
-            // Ícono de QR / Llave
-            Center(
-              child: Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: AppColors.lilaSuave.withValues(alpha: 0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.qr_code_scanner_rounded,
-                  size: 40,
-                  color: AppColors.moradoOscuro,
-                ),
-              ),
+        return StatefulBuilder(
+          builder: (sheetContext, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 24,
+              bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 28,
             ),
-            const SizedBox(height: 16),
-
-            // Título
-            const Text(
-              'Acceso para Paciente',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: AppColors.azulOscuro,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Escanea el código QR que te comparta tu cuidador o ingresa el código de vinculación.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFF64748B),
-                height: 1.3,
-              ),
-            ),
-            const SizedBox(height: 22),
-
-            // Campo de Token / Código
-            const Text(
-              'Código de Vinculación (Token)',
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.bold,
-                color: AppColors.azulOscuro,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _tokenController,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 3.0,
-                color: AppColors.moradoOscuro,
-              ),
-              decoration: InputDecoration(
-                hintText: 'EJ. VB-8492',
-                hintStyle: const TextStyle(color: Color(0xFF94A3B8), letterSpacing: 1),
-                filled: true,
-                fillColor: AppColors.fondo,
-                prefixIcon: const Icon(Icons.vpn_key_outlined, color: AppColors.moradoOscuro),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            // Opción de escanear QR
-            OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.moradoOscuro, width: 1.4),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('📷 Cámara lista: QR escaneado con éxito (Simulado)'),
-                    backgroundColor: AppColors.moradoOscuro,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Barra de agarre superior
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
-                );
-              },
-              icon: const Icon(Icons.qr_code_2_rounded, color: AppColors.moradoOscuro, size: 20),
-              label: const Text(
-                'Escanear Código QR con Cámara',
-                style: TextStyle(
-                  color: AppColors.moradoOscuro,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14.5,
                 ),
-              ),
-            ),
-            const SizedBox(height: 18),
+                const SizedBox(height: 20),
 
-            // Botón Aceptar y Entrar a la Pantalla Principal del Paciente
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.turquesa,
-                foregroundColor: const Color(0xFF1E3F38),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              onPressed: () {
-                Navigator.pop(context); // Cierra el modal
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ ¡Vinculado exitosamente! Bienvenido, Miguel Angel.'),
-                    backgroundColor: Color(0xFF336C60),
+                // Ícono de QR / Llave
+                Center(
+                  child: Container(
+                    width: 76,
+                    height: 76,
+                    decoration: BoxDecoration(
+                      color: AppColors.lilaSuave.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      size: 40,
+                      color: AppColors.moradoOscuro,
+                    ),
                   ),
-                );
-                // Pasa directamente a la pantalla principal del paciente
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const PacienteScreen()),
-                );
-              },
-              child: const Text(
-                'Aceptar y Entrar al Modo Paciente',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
                 ),
-              ),
+                const SizedBox(height: 16),
+
+                // Título
+                const Text(
+                  'Acceso para Paciente',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.azulOscuro,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Escanea el código QR que te comparta tu cuidador o ingresa el código de vinculación.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // Campo de Token / Código
+                const Text(
+                  'Código de Vinculación (Token)',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.azulOscuro,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _tokenController,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 3.0,
+                    color: AppColors.moradoOscuro,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'EJ. VB-8492',
+                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), letterSpacing: 1),
+                    filled: true,
+                    fillColor: AppColors.fondo,
+                    prefixIcon: const Icon(Icons.vpn_key_outlined, color: AppColors.moradoOscuro),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Opción de escanear QR
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.moradoOscuro, width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('📷 Cámara lista: QR escaneado con éxito (Simulado)'),
+                        backgroundColor: AppColors.moradoOscuro,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.qr_code_2_rounded, color: AppColors.moradoOscuro, size: 20),
+                  label: const Text(
+                    'Escanear Código QR con Cámara',
+                    style: TextStyle(
+                      color: AppColors.moradoOscuro,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Botón Aceptar y Entrar a la Pantalla Principal del Paciente
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.turquesa,
+                    foregroundColor: const Color(0xFF1E3F38),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  onPressed: cargandoToken
+                      ? null
+                      : () async {
+                          final token = _tokenController.text.trim();
+                          if (token.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Por favor ingresa un código de vinculación.'),
+                                backgroundColor: AppColors.terracota,
+                              ),
+                            );
+                            return;
+                          }
+
+                          setModalState(() => cargandoToken = true);
+                          final res = await AuthService.loginPacienteConToken(token: token);
+                          if (!mounted || !modalContext.mounted) return;
+                          setModalState(() => cargandoToken = false);
+
+                          if (res['exito'] == true) {
+                            if (Navigator.canPop(modalContext)) {
+                              Navigator.pop(modalContext); // Cierra el modal
+                            }
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '✅ ¡Vinculado exitosamente! Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
+                                ),
+                                backgroundColor: const Color(0xFF336C60),
+                              ),
+                            );
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => const PacienteScreen()),
+                            );
+                          } else {
+                            if (!mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(res['mensaje'] ?? 'Código de vinculación inválido.'),
+                                backgroundColor: AppColors.terracota,
+                              ),
+                            );
+                          }
+                        },
+                  child: cargandoToken
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF1E3F38),
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Aceptar y Entrar al Modo Paciente',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -240,11 +349,13 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ],
                         ),
-                        child: const Center(
-                          child: Icon(
-                            Icons.favorite_outline_rounded,
-                            size: 46,
-                            color: Color(0xFF756C98),
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Image.asset(
+                              'assets/images/logo_icono.png',
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
@@ -408,15 +519,24 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  onPressed: _iniciarSesionCuidador,
-                  child: const Text(
-                    'Iniciar Sesión (Cuidador)',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  onPressed: _cargandoCuidador ? null : _iniciarSesionCuidador,
+                  child: _cargandoCuidador
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : const Text(
+                          'Iniciar Sesión (Cuidador)',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 12),
 

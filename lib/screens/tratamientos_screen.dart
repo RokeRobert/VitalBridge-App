@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vital_bridge/screens/agregar_medicamento_screen.dart';
+import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class TratamientosScreen extends StatefulWidget {
@@ -102,6 +103,10 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () {
+              final id = _tratamientos[index]['id'];
+              if (id is int) {
+                TratamientosService.eliminarTratamiento(id);
+              }
               Navigator.pop(context);
               setState(() {
                 _tratamientos.removeAt(index);

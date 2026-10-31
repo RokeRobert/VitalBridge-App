@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
@@ -43,214 +44,271 @@ class TratamientosService {
     ),
   ];
 
-  static final List<TomaModel> _tomasHoySimuladas = [
-    TomaModel(
-      idHorario: 101,
-      idTratamiento: 3,
-      medicamento: 'Omeprazol',
-      dosis: '20 mg (1 cápsula)',
-      horaProgramada: '07:30 AM',
-      horaTomada: DateTime.now().copyWith(hour: 7, minute: 35),
-      estado: 'Tomada',
-    ),
-    TomaModel(
-      idHorario: 102,
-      idTratamiento: 1,
-      medicamento: 'Paracetamol',
-      dosis: '500 mg (1 tableta)',
-      horaProgramada: '08:00 AM',
-      horaTomada: DateTime.now().copyWith(hour: 8, minute: 02),
-      estado: 'Tomada',
-    ),
-    TomaModel(
-      idHorario: 103,
-      idTratamiento: 2,
-      medicamento: 'Losartán',
-      dosis: '50 mg (1 comprimido)',
-      horaProgramada: '09:00 AM',
-      estado: 'Pendiente',
-    ),
-    TomaModel(
-      idHorario: 104,
-      idTratamiento: 1,
-      medicamento: 'Paracetamol',
-      dosis: '500 mg (1 tableta)',
-      horaProgramada: '04:00 PM',
-      estado: 'Pendiente',
-    ),
-    TomaModel(
-      idHorario: 105,
-      idTratamiento: 2,
-      medicamento: 'Losartán',
-      dosis: '50 mg (1 comprimido)',
-      horaProgramada: '09:00 PM',
-      estado: 'Pendiente',
-    ),
-  ];
+  // Registro de tomas confirmadas para persistencia en sesión
+  static final Map<int, DateTime> _tomasConfirmadasMap = {};
 
-  /// Obtiene los tratamientos registrados para el paciente
+  /// Obtiene los headers de autenticación almacenados
+  static Future<Map<String, String>> _obtenerHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
+
+    return {
+      'Content-Type': 'application/json',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (usuarioId.isNotEmpty) 'X-User-Id': usuarioId,
+    };
+  }
+
+  /// Obtiene los tratamientos registrados para el paciente consultando la API en C#
   static Future<List<TratamientoModel>> obtenerTratamientos({String? pacienteId}) async {
+    final prefs = await SharedPreferences.getInstance();
     try {
-      final uri = pacienteId != null
+      final headers = await _obtenerHeaders();
+      final uri = (pacienteId != null && pacienteId.isNotEmpty)
           ? Uri.parse('${ApiConstants.tratamientos}?pacienteId=$pacienteId')
           : Uri.parse(ApiConstants.tratamientos);
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 5));
+      final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 7));
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        return data.map((item) => TratamientoModel.fromJson(item)).toList();
-      } else {
-        return List.from(_tratamientosSimulados);
+        final lista = data.map((item) => TratamientoModel.fromJson(item)).toList();
+
+        // Actualizar respaldo en memoria y caché local
+        _tratamientosSimulados.clear();
+        _tratamientosSimulados.addAll(lista);
+        await prefs.setString('cache_tratamientos_json', jsonEncode(data));
+
+        return lista;
       }
-    } catch (_) {
-      // Modo desarrollo / desconectado
-      return List.from(_tratamientosSimulados);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error al consultar tratamientos en la API: $e');
     }
+
+    // Respaldo de persistencia local en caché si la API no está disponible
+    final cacheJson = prefs.getString('cache_tratamientos_json');
+    if (cacheJson != null && cacheJson.isNotEmpty) {
+      try {
+        final List decoded = jsonDecode(cacheJson);
+        final enCache = decoded.map((item) => TratamientoModel.fromJson(item)).toList();
+        if (pacienteId != null && pacienteId.isNotEmpty) {
+          final filtrados = enCache.where((t) => t.idPaciente == pacienteId).toList();
+          if (filtrados.isNotEmpty) return filtrados;
+        }
+        return enCache;
+      } catch (_) {}
+    }
+
+    if (pacienteId != null && pacienteId.isNotEmpty) {
+      final filtrados = _tratamientosSimulados.where((t) => t.idPaciente == pacienteId).toList();
+      if (filtrados.isNotEmpty) return filtrados;
+    }
+
+    return List.from(_tratamientosSimulados);
   }
 
-  /// Agrega un nuevo tratamiento médico
+  /// Agrega un nuevo tratamiento médico en el backend
   static Future<Map<String, dynamic>> agregarTratamiento(TratamientoModel nuevoTratamiento) async {
     try {
+      final headers = await _obtenerHeaders();
       final response = await http
           .post(
             Uri.parse(ApiConstants.tratamientos),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode(nuevoTratamiento.toJson()),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final creado = TratamientoModel.fromJson(data);
-        _tratamientosSimulados.add(creado);
-        return {'exito': true, 'tratamiento': creado};
+        final TratamientoModel creado = data is Map && data.containsKey('tratamiento')
+            ? TratamientoModel.fromJson(data['tratamiento'])
+            : TratamientoModel.fromJson(data);
+
+        _tratamientosSimulados.insert(0, creado);
+        return {'exito': true, 'tratamiento': creado, 'mensaje': 'Tratamiento registrado con éxito.'};
       } else {
-        return {'exito': false, 'mensaje': 'Error del servidor al guardar el tratamiento.'};
+        return {
+          'exito': false,
+          'mensaje': 'El servidor respondió con error (${response.statusCode}): ${response.body}',
+        };
       }
-    } catch (_) {
-      // Guardar en la lista simulada para permitir probar la UI
-      _tratamientosSimulados.add(nuevoTratamiento);
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error de conexión al agregar tratamiento: $e');
+      _tratamientosSimulados.insert(0, nuevoTratamiento);
       return {
         'exito': true,
         'modoSimulacion': true,
         'tratamiento': nuevoTratamiento,
+        'mensaje': 'Guardado localmente (modo sin conexión)',
       };
     }
   }
 
-  /// Elimina un tratamiento por su ID
+  /// Actualiza los datos de un tratamiento existente en el backend
+  static Future<Map<String, dynamic>> actualizarTratamiento(TratamientoModel tratamiento) async {
+    try {
+      final headers = await _obtenerHeaders();
+      final response = await http
+          .put(
+            Uri.parse('${ApiConstants.tratamientos}/${tratamiento.id}'),
+            headers: headers,
+            body: jsonEncode(tratamiento.toJson()),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final TratamientoModel actualizado = data is Map && data.containsKey('tratamiento')
+            ? TratamientoModel.fromJson(data['tratamiento'])
+            : tratamiento;
+
+        final index = _tratamientosSimulados.indexWhere((t) => t.id == tratamiento.id);
+        if (index != -1) {
+          _tratamientosSimulados[index] = actualizado;
+        }
+
+        return {
+          'exito': true,
+          'mensaje': data is Map ? (data['mensaje'] ?? 'Tratamiento actualizado.') : 'Tratamiento actualizado.',
+          'tratamiento': actualizado,
+        };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': 'Error del servidor (${response.statusCode}): ${response.body}',
+        };
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error de conexión al actualizar tratamiento: $e');
+      final index = _tratamientosSimulados.indexWhere((t) => t.id == tratamiento.id);
+      if (index != -1) {
+        _tratamientosSimulados[index] = tratamiento;
+      }
+      return {
+        'exito': true,
+        'modoSimulacion': true,
+        'tratamiento': tratamiento,
+        'mensaje': 'Actualizado localmente (modo sin conexión)',
+      };
+    }
+  }
+
+  /// Elimina un tratamiento por su ID (Borrado lógico en el backend)
   static Future<bool> eliminarTratamiento(int id) async {
     try {
+      final headers = await _obtenerHeaders();
       final response = await http
-          .delete(Uri.parse('${ApiConstants.tratamientos}/$id'))
-          .timeout(const Duration(seconds: 5));
+          .delete(
+            Uri.parse('${ApiConstants.tratamientos}/$id'),
+            headers: headers,
+          )
+          .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         _tratamientosSimulados.removeWhere((t) => t.id == id);
         return true;
       }
-    } catch (_) {
-      _tratamientosSimulados.removeWhere((t) => t.id == id);
-      return true;
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error de conexión al eliminar tratamiento: $e');
     }
+
     _tratamientosSimulados.removeWhere((t) => t.id == id);
     return true;
   }
 
   /// Obtiene la lista de tomas programadas para hoy para un paciente específico
   static Future<List<TomaModel>> obtenerTomasHoy({String? pacienteId}) async {
-    try {
-      final uri = pacienteId != null
-          ? Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId')
-          : Uri.parse(ApiConstants.tomasHoy);
+    if (pacienteId == null || pacienteId.isEmpty) return [];
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+    try {
+      final headers = await _obtenerHeaders();
+      final uri = Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId');
+
+      final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        return data.map((item) => TomaModel.fromJson(item)).toList();
+        if (data.isNotEmpty) {
+          final tomasDesdeApi = data.map((item) => TomaModel.fromJson(item)).toList();
+          return tomasDesdeApi;
+        }
       }
-    } catch (_) {}
-
-    // Respaldo en memoria: solo devuelve las tomas que pertenezcan a este paciente
-    if (pacienteId == null) return [];
-
-    // Buscar si hay tratamientos registrados para este paciente
-    final tratamientosDelPaciente = _tratamientosSimulados
-        .where((t) => t.idPaciente == pacienteId)
-        .toList();
-
-    if (tratamientosDelPaciente.isEmpty) {
-      return [];
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error al consultar tomas de la API: $e');
     }
 
-    // Generar tomas del día para los tratamientos de este paciente
+    // Si la API devolvió lista vacía o falló la conexión:
+    // Generar las tomas del día directamente a partir de los tratamientos reales del paciente
+    final tratamientos = await obtenerTratamientos(pacienteId: pacienteId);
+    if (tratamientos.isEmpty) return [];
+
     final List<TomaModel> tomasPaciente = [];
-    for (var trat in tratamientosDelPaciente) {
-      for (int i = 0; i < trat.horarios.length; i++) {
-        final hora = trat.horarios[i];
+
+    for (var trat in tratamientos) {
+      if (!trat.activo) continue;
+
+      final horarios = trat.horarios.isNotEmpty ? trat.horarios : ['08:00 AM'];
+
+      for (int i = 0; i < horarios.length; i++) {
+        final hora = horarios[i];
+        final idHorario = trat.id * 100 + i + 1;
+        final horaConfirmada = _tomasConfirmadasMap[idHorario];
+        final esTomada = horaConfirmada != null;
+
         tomasPaciente.add(
           TomaModel(
-            idHorario: trat.id * 100 + i + 1,
+            idHorario: idHorario,
             idTratamiento: trat.id,
             medicamento: trat.medicamento,
             dosis: trat.dosisLegible,
             horaProgramada: hora,
-            estado: 'Pendiente',
+            horaTomada: horaConfirmada,
+            estado: esTomada ? 'Tomada' : 'Pendiente',
           ),
         );
       }
     }
 
+    // Ordenar cronológicamente por hora programada
+    tomasPaciente.sort((a, b) => a.horaProgramada.compareTo(b.horaProgramada));
     return tomasPaciente;
   }
 
   /// Marca una toma como realizada (confirmada por paciente o cuidador)
   static Future<bool> confirmarToma(int idHorario, {String? observaciones}) async {
+    _tomasConfirmadasMap[idHorario] = DateTime.now();
+
     try {
+      final headers = await _obtenerHeaders();
       final Map<String, dynamic> body = {
         'idHorario': idHorario,
         'horaTomada': DateTime.now().toIso8601String(),
+        if (observaciones != null) 'observaciones': observaciones,
       };
-      if (observaciones != null) {
-        body['observaciones'] = observaciones;
-      }
 
       final response = await http
           .post(
             Uri.parse(ApiConstants.confirmarToma),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        _actualizarTomaSimulada(idHorario);
         return true;
       }
-    } catch (_) {
-      _actualizarTomaSimulada(idHorario);
-      return true;
+    } catch (e) {
+      // ignore: avoid_print
+      print('Aviso: la toma se confirmó localmente: $e');
     }
-    _actualizarTomaSimulada(idHorario);
-    return true;
-  }
 
-  static void _actualizarTomaSimulada(int idHorario) {
-    final index = _tomasHoySimuladas.indexWhere((t) => t.idHorario == idHorario);
-    if (index != -1) {
-      final antigua = _tomasHoySimuladas[index];
-      _tomasHoySimuladas[index] = TomaModel(
-        idHorario: antigua.idHorario,
-        idTratamiento: antigua.idTratamiento,
-        medicamento: antigua.medicamento,
-        dosis: antigua.dosis,
-        horaProgramada: antigua.horaProgramada,
-        horaTomada: DateTime.now(),
-        estado: 'Tomada',
-        observaciones: antigua.observaciones,
-      );
-    }
+    return true;
   }
 }

@@ -350,7 +350,14 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
   /// EMPTY STATE: Vista cuando el cuidador recién ingresa y NO tiene pacientes registrados
   Widget _construirVistaEmptyState() {
     return SafeArea(
-      child: SingleChildScrollView(
+      child: RefreshIndicator(
+        color: AppColors.moradoOscuro,
+        onRefresh: () async {
+          await _cargarPacientes();
+          await _cargarTomasHoy();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -508,6 +515,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -567,7 +575,14 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
     final paciente = _pacienteSeleccionado!;
 
     return SafeArea(
-      child: SingleChildScrollView(
+      child: RefreshIndicator(
+        color: AppColors.moradoOscuro,
+        onRefresh: () async {
+          await _cargarPacientes();
+          await _cargarTomasHoy();
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1322,6 +1337,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
           ],
         ),
       ),
+      ),
     );
   }
 
@@ -1347,7 +1363,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
         ),
       );
     } else if (_tabSeleccionado == 1) {
-      cuerpo = const TratamientosScreen(mostrarBotonVolver: false);
+      cuerpo = TratamientosScreen(mostrarBotonVolver: false, pacienteId: _pacienteSeleccionado?.id, nombrePaciente: _pacienteSeleccionado?.nombre);
     } else if (_tabSeleccionado == 2) {
       cuerpo = PerfilCuidadorScreen(
         onVolverAMonitoreo: () {
@@ -1367,6 +1383,9 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
         currentIndex: _tabSeleccionado,
         onTap: (index) {
           setState(() => _tabSeleccionado = index);
+          if (index == 0) {
+            _cargarTomasHoy();
+          }
         },
         selectedItemColor: AppColors.moradoOscuro,
         unselectedItemColor: Colors.grey[500],

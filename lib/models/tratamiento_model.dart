@@ -13,7 +13,7 @@ class TratamientoModel {
   final DateTime? fechaFinal;
   final String? indicaciones;
   final bool activo;
-  final List<String> horarios; // Ej: ["08:00", "16:00", "00:00"]
+  final List<String> horarios; // Ej: ["08:00 AM", "08:00 PM"]
   final String presentacion; // Ej: "Tableta", "Cápsula", "Jarabe"
 
   TratamientoModel({
@@ -97,6 +97,7 @@ class TratamientoModel {
       if (idUsuario != null) 'idUsuario': idUsuario,
       'medicamento': medicamento,
       'cantidad': cantidad,
+      'unidadMedida': unidadMedida,
       if (idUnidadMedida != null) 'idUnidadMedida': idUnidadMedida,
       'frecuencia': frecuencia,
       'fechaInicio': fechaInicio.toIso8601String().split('T').first,
@@ -104,6 +105,7 @@ class TratamientoModel {
       'indicaciones': indicaciones,
       'activo': activo,
       'horarios': horarios,
+      'presentacion': presentacion,
     };
   }
 
@@ -142,4 +144,3 @@ class TratamientoModel {
     );
   }
 }
-

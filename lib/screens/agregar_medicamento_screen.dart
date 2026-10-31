@@ -6,11 +6,13 @@ import 'package:vital_bridge/theme/app_colors.dart';
 class AgregarMedicamentoScreen extends StatefulWidget {
   final String? idPaciente;
   final String? nombrePaciente;
+  final TratamientoModel? tratamientoParaEditar;
 
   const AgregarMedicamentoScreen({
     super.key,
     this.idPaciente,
     this.nombrePaciente,
+    this.tratamientoParaEditar,
   });
 
   @override
@@ -24,6 +26,8 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
   final TextEditingController _dosisController = TextEditingController();
   final TextEditingController _indicacionesController = TextEditingController();
 
+  bool _guardando = false;
+
   // Tipo de presentación seleccionada
   String _tipoSeleccionado = 'Tableta';
   final List<Map<String, dynamic>> _tipos = [
@@ -35,7 +39,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
   ];
 
   // Horarios de toma programados
-  final List<TimeOfDay> _horarios = [
+  List<TimeOfDay> _horarios = [
     const TimeOfDay(hour: 8, minute: 0),
     const TimeOfDay(hour: 20, minute: 0),
   ];
@@ -73,6 +77,51 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
     'En ayunas',
     'Antes de dormir',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Si viene un tratamiento para editar, precargar sus campos
+    if (widget.tratamientoParaEditar != null) {
+      final t = widget.tratamientoParaEditar!;
+      _nombreController.text = t.medicamento;
+      _dosisController.text = t.cantidad % 1 == 0 ? t.cantidad.toInt().toString() : t.cantidad.toString();
+      _tipoSeleccionado = t.presentacion.isNotEmpty ? t.presentacion : 'Tableta';
+      _indicacionesController.text = t.indicaciones ?? '';
+
+      if (t.fechaFinal != null) {
+        _esDePorVida = false;
+        _fechaFinPersonalizada = t.fechaFinal;
+        _duracionSeleccionada = 'Fecha específica';
+      } else {
+        _esDePorVida = true;
+      }
+
+      if (t.horarios.isNotEmpty) {
+        _horarios = t.horarios.map(_parseTimeOfDay).toList();
+      }
+    }
+  }
+
+  TimeOfDay _parseTimeOfDay(String horaStr) {
+    try {
+      final clean = horaStr.trim().toUpperCase();
+      if (clean.contains('AM') || clean.contains('PM')) {
+        final partes = clean.split(' ');
+        final tiempo = partes[0].split(':');
+        int hora = int.parse(tiempo[0]);
+        final int minuto = int.parse(tiempo[1]);
+        if (partes[1] == 'PM' && hora < 12) hora += 12;
+        if (partes[1] == 'AM' && hora == 12) hora = 0;
+        return TimeOfDay(hour: hora, minute: minuto);
+      } else {
+        final partes = clean.split(':');
+        return TimeOfDay(hour: int.parse(partes[0]), minute: int.parse(partes[1]));
+      }
+    } catch (_) {
+      return const TimeOfDay(hour: 8, minute: 0);
+    }
+  }
 
   @override
   void dispose() {
@@ -148,7 +197,27 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
     return activos.join(', ');
   }
 
+  String _resolverUnidadMedida() {
+    switch (_tipoSeleccionado.toLowerCase()) {
+      case 'cápsula':
+      case 'capsula':
+        return 'cápsula';
+      case 'jarabe':
+        return 'ml';
+      case 'gotas':
+        return 'gotas';
+      case 'inyección':
+      case 'inyeccion':
+        return 'dosis';
+      case 'tableta':
+      default:
+        return 'tableta';
+    }
+  }
+
   Future<void> _guardarMedicamento() async {
+    if (_guardando) return;
+
     if (_formKey.currentState!.validate()) {
       if (!_todosLosDias && !_diasSemana.containsValue(true)) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -160,6 +229,8 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
         return;
       }
 
+      setState(() => _guardando = true);
+
       final String dias = _resumenDias();
       final String vigencia = _esDePorVida
           ? 'Tratamiento continuo'
@@ -167,52 +238,87 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
               ? 'Hasta ${_fechaFinPersonalizada!.day}/${_fechaFinPersonalizada!.month}/${_fechaFinPersonalizada!.year}'
               : 'Por $_duracionSeleccionada');
 
-      // Registrar mediante el servicio de tratamientos
-      final nuevo = TratamientoModel(
-        id: DateTime.now().millisecondsSinceEpoch % 10000,
-        idPaciente: widget.idPaciente,
+      DateTime? fechaFinCalculada;
+      if (!_esDePorVida) {
+        if (_duracionSeleccionada == 'Fecha específica' && _fechaFinPersonalizada != null) {
+          fechaFinCalculada = _fechaFinPersonalizada;
+        } else if (_duracionSeleccionada == '7 días') {
+          fechaFinCalculada = DateTime.now().add(const Duration(days: 7));
+        } else if (_duracionSeleccionada == '14 días') {
+          fechaFinCalculada = DateTime.now().add(const Duration(days: 14));
+        } else if (_duracionSeleccionada == '1 mes') {
+          fechaFinCalculada = DateTime.now().add(const Duration(days: 30));
+        }
+      }
+
+      final String indicacionesFinales = _indicacionesController.text.trim().isNotEmpty
+          ? '${_indicacionesController.text.trim()} ($_momentoComida)'
+          : _momentoComida;
+
+      final bool esEdicion = widget.tratamientoParaEditar != null;
+
+      final tratamientoAEnviar = TratamientoModel(
+        id: esEdicion ? widget.tratamientoParaEditar!.id : 0,
+        idPaciente: widget.idPaciente ?? widget.tratamientoParaEditar?.idPaciente,
         medicamento: _nombreController.text.trim(),
         cantidad: double.tryParse(_dosisController.text.trim()) ?? 1.0,
-        unidadMedida: 'tableta',
+        unidadMedida: _resolverUnidadMedida(),
         frecuencia: dias,
-        fechaInicio: DateTime.now(),
-        fechaFinal: _esDePorVida ? null : _fechaFinPersonalizada,
-        indicaciones: _indicacionesController.text.trim().isNotEmpty
-            ? '${_indicacionesController.text.trim()} ($_momentoComida)'
-            : _momentoComida,
+        fechaInicio: esEdicion ? widget.tratamientoParaEditar!.fechaInicio : DateTime.now(),
+        fechaFinal: _esDePorVida ? null : fechaFinCalculada,
+        indicaciones: indicacionesFinales,
         horarios: _horarios.map(_formatearHora).toList(),
         presentacion: _tipoSeleccionado,
       );
 
-      await TratamientosService.agregarTratamiento(nuevo);
+      final resultado = esEdicion
+          ? await TratamientosService.actualizarTratamiento(tratamientoAEnviar)
+          : await TratamientosService.agregarTratamiento(tratamientoAEnviar);
 
       if (!mounted) return;
+      setState(() => _guardando = false);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '✅ ¡${_nombreController.text} guardado!\nProgramado: $dias ($vigencia)',
-            style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+      if (resultado['exito'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              esEdicion
+                  ? '✅ ¡${_nombreController.text} actualizado correctamente!'
+                  : '✅ ¡${_nombreController.text} guardado!\nProgramado: $dias ($vigencia)',
+              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: const Color(0xFF336C60),
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: const Color(0xFF336C60),
-          duration: const Duration(seconds: 4),
-        ),
-      );
-      Navigator.of(context).maybePop(true);
+        );
+        Navigator.of(context).pop(true);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              resultado['mensaje'] ?? 'Error al guardar el medicamento en el servidor.',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final bool esEdicion = widget.tratamientoParaEditar != null;
+
     return Scaffold(
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: AppColors.azulOscuro,
-        title: const Text(
-          'Nuevo Medicamento',
-          style: TextStyle(
+        title: Text(
+          esEdicion ? 'Editar Medicamento' : 'Nuevo Medicamento',
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.azulOscuro,
@@ -256,8 +362,8 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                                 color: AppColors.azulOscuro,
                               ),
                             ),
-                            SizedBox(height: 2),
-                            Text(
+                            const SizedBox(height: 2),
+                            const Text(
                               'Los horarios se sincronizarán de inmediato en el teléfono de tu familiar.',
                               style: TextStyle(
                                 fontSize: 12.5,
@@ -476,9 +582,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                 ),
                 const SizedBox(height: 26),
 
-                // ==========================================
-                // NUEVA SECCIÓN: Días en que le toca la toma
-                // ==========================================
+                // Sección: Días en que le toca la toma
                 const Text(
                   '¿Qué días le toca la toma? *',
                   style: TextStyle(
@@ -538,7 +642,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Círculos interactivos de los 7 días de la semana
+                // Círculos de los 7 días de la semana
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                   decoration: BoxDecoration(
@@ -555,7 +659,6 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                         onTap: () {
                           setState(() {
                             _diasSemana[dia] = !_diasSemana[dia]!;
-                            // Si se desmarca alguno, ya no son "todos los días"
                             if (_diasSemana.containsValue(false)) {
                               _todosLosDias = false;
                             } else {
@@ -590,9 +693,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                 ),
                 const SizedBox(height: 26),
 
-                // ==========================================
-                // NUEVA SECCIÓN: Duración del tratamiento
-                // ==========================================
+                // Sección: Duración del tratamiento
                 const Text(
                   'Duración del Tratamiento *',
                   style: TextStyle(
@@ -650,7 +751,6 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                   ],
                 ),
 
-                // Si es por periodo definido, muestra las opciones de duración
                 if (!_esDePorVida) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -772,21 +872,30 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                       borderRadius: BorderRadius.circular(18),
                     ),
                   ),
-                  onPressed: _guardarMedicamento,
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_rounded, size: 22, color: Color(0xFF1E3F38)),
-                      SizedBox(width: 8),
-                      Text(
-                        'Guardar Medicamento',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
+                  onPressed: _guardando ? null : _guardarMedicamento,
+                  child: _guardando
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Color(0xFF1E3F38),
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.check_circle_rounded, size: 22, color: Color(0xFF1E3F38)),
+                            const SizedBox(width: 8),
+                            Text(
+                              esEdicion ? 'Guardar Cambios' : 'Guardar Medicamento',
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 12),
 

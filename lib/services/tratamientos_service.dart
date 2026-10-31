@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
+import 'package:vital_bridge/services/auth_service.dart';
 
 class TratamientosService {
   // Lista en memoria para modo desarrollo / simulación sin backend encendido
@@ -44,6 +45,56 @@ class TratamientosService {
     ),
   ];
 
+  static final List<TomaModel> _tomasHoySimuladas = [
+    TomaModel(
+      idHorario: 101,
+      idTratamiento: 3,
+      medicamento: 'Omeprazol',
+      dosis: '20 mg (1 cápsula)',
+      horaProgramada: '07:30 AM',
+      horaTomada: DateTime.now().copyWith(hour: 7, minute: 35),
+      estado: 'Tomada',
+      indicaciones: 'Tomar en ayunas con agua',
+    ),
+    TomaModel(
+      idHorario: 102,
+      idTratamiento: 1,
+      medicamento: 'Paracetamol',
+      dosis: '500 mg (1 tableta)',
+      horaProgramada: '08:00 AM',
+      horaTomada: DateTime.now().copyWith(hour: 8, minute: 02),
+      estado: 'Tomada',
+      indicaciones: 'Después del desayuno',
+    ),
+    TomaModel(
+      idHorario: 103,
+      idTratamiento: 2,
+      medicamento: 'Losartán',
+      dosis: '50 mg (1 comprimido)',
+      horaProgramada: '09:00 AM',
+      estado: 'Pendiente',
+      indicaciones: 'Para la presión arterial',
+    ),
+    TomaModel(
+      idHorario: 104,
+      idTratamiento: 1,
+      medicamento: 'Paracetamol',
+      dosis: '500 mg (1 tableta)',
+      horaProgramada: '04:00 PM',
+      estado: 'Pendiente',
+      indicaciones: 'Con abundante agua',
+    ),
+    TomaModel(
+      idHorario: 105,
+      idTratamiento: 2,
+      medicamento: 'Losartán',
+      dosis: '50 mg (1 comprimido)',
+      horaProgramada: '09:00 PM',
+      estado: 'Pendiente',
+      indicaciones: 'Antes de dormir',
+    ),
+  ];
+
   // Registro de tomas confirmadas para persistencia en sesión
   static final Map<int, DateTime> _tomasConfirmadasMap = {};
 
@@ -64,7 +115,9 @@ class TratamientosService {
   static Future<List<TratamientoModel>> obtenerTratamientos({String? pacienteId}) async {
     final prefs = await SharedPreferences.getInstance();
     try {
+      pacienteId ??= await AuthService.obtenerUsuarioId();
       final headers = await _obtenerHeaders();
+
       final uri = (pacienteId != null && pacienteId.isNotEmpty)
           ? Uri.parse('${ApiConstants.tratamientos}?pacienteId=$pacienteId')
           : Uri.parse(ApiConstants.tratamientos);
@@ -198,8 +251,25 @@ class TratamientosService {
     }
   }
 
-  /// Elimina un tratamiento por su ID (Borrado lógico en el backend)
+  /// Elimina un tratamiento por su ID (Borrado lógico en el backend y reflejo inmediato)
   static Future<bool> eliminarTratamiento(int id) async {
+    // 1. Obtener datos del medicamento antes de borrarlo de memoria
+    final index = _tratamientosSimulados.indexWhere((t) => t.id == id);
+    String medicamentoBorrado = '';
+    if (index != -1) {
+      medicamentoBorrado = _tratamientosSimulados[index].medicamento.trim().toLowerCase();
+      _tratamientosSimulados.removeAt(index);
+    }
+
+    // 2. Eliminar de inmediato las tomas del día asociadas para que
+    // el paciente deje de ver las tomas de este medicamento de inmediato.
+    _tomasHoySimuladas.removeWhere((toma) {
+      final coincideId = toma.idTratamiento == id;
+      final coincideNombre = medicamentoBorrado.isNotEmpty &&
+          toma.medicamento.trim().toLowerCase() == medicamentoBorrado;
+      return coincideId || coincideNombre;
+    });
+
     try {
       final headers = await _obtenerHeaders();
       final response = await http
@@ -213,22 +283,24 @@ class TratamientosService {
         _tratamientosSimulados.removeWhere((t) => t.id == id);
         return true;
       }
+      return false;
     } catch (e) {
       // ignore: avoid_print
       print('Error de conexión al eliminar tratamiento: $e');
+      _tratamientosSimulados.removeWhere((t) => t.id == id);
+      return true;
     }
-
-    _tratamientosSimulados.removeWhere((t) => t.id == id);
-    return true;
   }
 
   /// Obtiene la lista de tomas programadas para hoy para un paciente específico
   static Future<List<TomaModel>> obtenerTomasHoy({String? pacienteId}) async {
-    if (pacienteId == null || pacienteId.isEmpty) return [];
-
     try {
+      pacienteId ??= await AuthService.obtenerUsuarioId();
       final headers = await _obtenerHeaders();
-      final uri = Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId');
+
+      final uri = (pacienteId != null && pacienteId.isNotEmpty)
+          ? Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId')
+          : Uri.parse(ApiConstants.tomasHoy);
 
       final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 6));
 
@@ -241,11 +313,10 @@ class TratamientosService {
       }
     } catch (e) {
       // ignore: avoid_print
-      print('Error al consultar tomas de la API: $e');
+      print('Aviso: modo offline para tomas: $e');
     }
 
-    // Si la API devolvió lista vacía o falló la conexión:
-    // Generar las tomas del día directamente a partir de los tratamientos reales del paciente
+    // Respaldo en memoria / offline:
     final tratamientos = await obtenerTratamientos(pacienteId: pacienteId);
     if (tratamientos.isEmpty) return [];
 
@@ -262,17 +333,27 @@ class TratamientosService {
         final horaConfirmada = _tomasConfirmadasMap[idHorario];
         final esTomada = horaConfirmada != null;
 
-        tomasPaciente.add(
-          TomaModel(
-            idHorario: idHorario,
-            idTratamiento: trat.id,
-            medicamento: trat.medicamento,
-            dosis: trat.dosisLegible,
-            horaProgramada: hora,
-            horaTomada: horaConfirmada,
-            estado: esTomada ? 'Tomada' : 'Pendiente',
-          ),
+        // Verificar si ya fue marcada como tomada en _tomasHoySimuladas
+        final previaIndex = _tomasHoySimuladas.indexWhere(
+          (t) => t.idTratamiento == trat.id && t.horaProgramada == hora,
         );
+
+        if (previaIndex != -1) {
+          tomasPaciente.add(_tomasHoySimuladas[previaIndex]);
+        } else {
+          tomasPaciente.add(
+            TomaModel(
+              idHorario: idHorario,
+              idTratamiento: trat.id,
+              medicamento: trat.medicamento,
+              dosis: trat.dosisLegible,
+              horaProgramada: hora,
+              horaTomada: horaConfirmada,
+              estado: esTomada ? 'Tomada' : 'Pendiente',
+              indicaciones: trat.indicaciones,
+            ),
+          );
+        }
       }
     }
 
@@ -284,12 +365,13 @@ class TratamientosService {
   /// Marca una toma como realizada (confirmada por paciente o cuidador)
   static Future<bool> confirmarToma(int idHorario, {String? observaciones}) async {
     _tomasConfirmadasMap[idHorario] = DateTime.now();
+    _actualizarTomaSimulada(idHorario);
 
     try {
       final headers = await _obtenerHeaders();
       final Map<String, dynamic> body = {
         'idHorario': idHorario,
-        'horaTomada': DateTime.now().toIso8601String(),
+        'horaTomada': DateTime.now().toUtc().toIso8601String(),
         if (observaciones != null) 'observaciones': observaciones,
       };
 
@@ -310,5 +392,16 @@ class TratamientosService {
     }
 
     return true;
+  }
+
+  static void _actualizarTomaSimulada(int idHorario) {
+    final index = _tomasHoySimuladas.indexWhere((t) => t.idHorario == idHorario);
+    if (index != -1) {
+      final antigua = _tomasHoySimuladas[index];
+      _tomasHoySimuladas[index] = antigua.copyWith(
+        horaTomada: DateTime.now(),
+        estado: 'Tomada',
+      );
+    }
   }
 }

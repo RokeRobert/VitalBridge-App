@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
+import 'package:vital_bridge/services/auth_service.dart';
 
 class TratamientosService {
   // Lista en memoria para modo desarrollo / simulación sin backend encendido
@@ -52,6 +53,7 @@ class TratamientosService {
       horaProgramada: '07:30 AM',
       horaTomada: DateTime.now().copyWith(hour: 7, minute: 35),
       estado: 'Tomada',
+      indicaciones: 'Tomar en ayunas con agua',
     ),
     TomaModel(
       idHorario: 102,
@@ -61,6 +63,7 @@ class TratamientosService {
       horaProgramada: '08:00 AM',
       horaTomada: DateTime.now().copyWith(hour: 8, minute: 02),
       estado: 'Tomada',
+      indicaciones: 'Después del desayuno',
     ),
     TomaModel(
       idHorario: 103,
@@ -69,6 +72,7 @@ class TratamientosService {
       dosis: '50 mg (1 comprimido)',
       horaProgramada: '09:00 AM',
       estado: 'Pendiente',
+      indicaciones: 'Para la presión arterial',
     ),
     TomaModel(
       idHorario: 104,
@@ -77,6 +81,7 @@ class TratamientosService {
       dosis: '500 mg (1 tableta)',
       horaProgramada: '04:00 PM',
       estado: 'Pendiente',
+      indicaciones: 'Con abundante agua',
     ),
     TomaModel(
       idHorario: 105,
@@ -85,13 +90,16 @@ class TratamientosService {
       dosis: '50 mg (1 comprimido)',
       horaProgramada: '09:00 PM',
       estado: 'Pendiente',
+      indicaciones: 'Antes de dormir',
     ),
   ];
 
   /// Obtiene los tratamientos registrados para el paciente
   static Future<List<TratamientoModel>> obtenerTratamientos({String? pacienteId}) async {
     try {
-      final uri = pacienteId != null
+      pacienteId ??= await AuthService.obtenerUsuarioId();
+
+      final uri = (pacienteId != null && pacienteId.isNotEmpty)
           ? Uri.parse('${ApiConstants.tratamientos}?pacienteId=$pacienteId')
           : Uri.parse(ApiConstants.tratamientos);
 
@@ -100,13 +108,19 @@ class TratamientosService {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((item) => TratamientoModel.fromJson(item)).toList();
-      } else {
-        return List.from(_tratamientosSimulados);
       }
     } catch (_) {
       // Modo desarrollo / desconectado
-      return List.from(_tratamientosSimulados);
     }
+
+    if (pacienteId != null && pacienteId.isNotEmpty) {
+      final filtrados = _tratamientosSimulados
+          .where((t) => t.idPaciente == pacienteId)
+          .toList();
+      return filtrados;
+    }
+
+    return List.from(_tratamientosSimulados);
   }
 
   /// Agrega un nuevo tratamiento médico
@@ -139,71 +153,91 @@ class TratamientosService {
     }
   }
 
-  /// Elimina un tratamiento por su ID
+  /// Elimina un tratamiento por su ID (garantiza reflejo inmediato en el paciente)
   static Future<bool> eliminarTratamiento(int id) async {
+    // 1. Obtener datos del medicamento antes de borrarlo de memoria
+    final index = _tratamientosSimulados.indexWhere((t) => t.id == id);
+    String medicamentoBorrado = '';
+    if (index != -1) {
+      medicamentoBorrado = _tratamientosSimulados[index].medicamento.trim().toLowerCase();
+      _tratamientosSimulados.removeAt(index);
+    }
+
+    // 2. Eliminar de inmediato las tomas del día asociadas para que
+    // el paciente deje de ver las tomas de este medicamento de inmediato.
+    _tomasHoySimuladas.removeWhere((toma) {
+      final coincideId = toma.idTratamiento == id;
+      final coincideNombre = medicamentoBorrado.isNotEmpty &&
+          toma.medicamento.trim().toLowerCase() == medicamentoBorrado;
+      return coincideId || coincideNombre;
+    });
+
     try {
       final response = await http
           .delete(Uri.parse('${ApiConstants.tratamientos}/$id'))
           .timeout(const Duration(seconds: 5));
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        _tratamientosSimulados.removeWhere((t) => t.id == id);
-        return true;
-      }
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (_) {
-      _tratamientosSimulados.removeWhere((t) => t.id == id);
       return true;
     }
-    _tratamientosSimulados.removeWhere((t) => t.id == id);
-    return true;
   }
 
   /// Obtiene la lista de tomas programadas para hoy para un paciente específico
   static Future<List<TomaModel>> obtenerTomasHoy({String? pacienteId}) async {
     try {
-      final uri = pacienteId != null
+      // Si no se proporcionó pacienteId, obtener el del usuario en sesión
+      pacienteId ??= await AuthService.obtenerUsuarioId();
+
+      final uri = (pacienteId != null && pacienteId.isNotEmpty)
           ? Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId')
           : Uri.parse(ApiConstants.tomasHoy);
 
-      final response = await http.get(uri).timeout(const Duration(seconds: 4));
+      final response = await http.get(uri).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         return data.map((item) => TomaModel.fromJson(item)).toList();
       }
-    } catch (_) {}
+    } catch (_) {
+      // Fallback a simulación si no hay conexión al backend
+    }
 
-    // Respaldo en memoria: solo devuelve las tomas que pertenezcan a este paciente
-    if (pacienteId == null) return [];
+    // Respaldo en memoria / offline:
+    // Solo generamos o mostramos tomas para tratamientos que realmente sigan activos
+    final tratamientosActivos = (pacienteId != null && pacienteId.isNotEmpty)
+        ? _tratamientosSimulados.where((t) => t.idPaciente == pacienteId).toList()
+        : _tratamientosSimulados;
 
-    // Buscar si hay tratamientos registrados para este paciente
-    final tratamientosDelPaciente = _tratamientosSimulados
-        .where((t) => t.idPaciente == pacienteId)
-        .toList();
-
-    if (tratamientosDelPaciente.isEmpty) {
+    // Si el paciente no tiene tratamientos activos (fueron borrados o no se han creado),
+    // devolvemos lista vacía para mostrar el Empty State correspondiente.
+    if (tratamientosActivos.isEmpty) {
       return [];
     }
 
-    // Generar tomas del día para los tratamientos de este paciente
-    final List<TomaModel> tomasPaciente = [];
-    for (var trat in tratamientosDelPaciente) {
+    // Si existen tratamientos activos, generar sus tomas correspondientes para el día
+    final List<TomaModel> tomasGeneradas = [];
+    for (var trat in tratamientosActivos) {
       for (int i = 0; i < trat.horarios.length; i++) {
         final hora = trat.horarios[i];
-        tomasPaciente.add(
-          TomaModel(
+        // Verificar si ya fue marcada como tomada en _tomasHoySimuladas
+        final previa = _tomasHoySimuladas.firstWhere(
+          (t) => t.idTratamiento == trat.id && t.horaProgramada == hora,
+          orElse: () => TomaModel(
             idHorario: trat.id * 100 + i + 1,
             idTratamiento: trat.id,
             medicamento: trat.medicamento,
             dosis: trat.dosisLegible,
             horaProgramada: hora,
             estado: 'Pendiente',
+            indicaciones: trat.indicaciones,
           ),
         );
+        tomasGeneradas.add(previa);
       }
     }
 
-    return tomasPaciente;
+    return tomasGeneradas;
   }
 
   /// Marca una toma como realizada (confirmada por paciente o cuidador)
@@ -211,7 +245,7 @@ class TratamientosService {
     try {
       final Map<String, dynamic> body = {
         'idHorario': idHorario,
-        'horaTomada': DateTime.now().toIso8601String(),
+        'horaTomada': DateTime.now().toUtc().toIso8601String(),
       };
       if (observaciones != null) {
         body['observaciones'] = observaciones;
@@ -223,33 +257,27 @@ class TratamientosService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode(body),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         _actualizarTomaSimulada(idHorario);
         return true;
       }
+      return false;
     } catch (_) {
+      // Respaldo offline / simulación
       _actualizarTomaSimulada(idHorario);
       return true;
     }
-    _actualizarTomaSimulada(idHorario);
-    return true;
   }
 
   static void _actualizarTomaSimulada(int idHorario) {
     final index = _tomasHoySimuladas.indexWhere((t) => t.idHorario == idHorario);
     if (index != -1) {
       final antigua = _tomasHoySimuladas[index];
-      _tomasHoySimuladas[index] = TomaModel(
-        idHorario: antigua.idHorario,
-        idTratamiento: antigua.idTratamiento,
-        medicamento: antigua.medicamento,
-        dosis: antigua.dosis,
-        horaProgramada: antigua.horaProgramada,
+      _tomasHoySimuladas[index] = antigua.copyWith(
         horaTomada: DateTime.now(),
         estado: 'Tomada',
-        observaciones: antigua.observaciones,
       );
     }
   }

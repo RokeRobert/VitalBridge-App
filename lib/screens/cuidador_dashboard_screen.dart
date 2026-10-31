@@ -1347,7 +1347,10 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
         ),
       );
     } else if (_tabSeleccionado == 1) {
-      cuerpo = const TratamientosScreen(mostrarBotonVolver: false);
+      cuerpo = TratamientosScreen(
+        mostrarBotonVolver: false,
+        pacienteId: _pacienteSeleccionado?.id,
+      );
     } else if (_tabSeleccionado == 2) {
       cuerpo = PerfilCuidadorScreen(
         onVolverAMonitoreo: () {

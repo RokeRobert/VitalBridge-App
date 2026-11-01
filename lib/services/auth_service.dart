@@ -28,8 +28,17 @@ class AuthService {
           .timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final usuario = UsuarioModel.fromJson(data['usuario'] ?? data);
+        final decoded = jsonDecode(response.body);
+        final Map<String, dynamic> data = (decoded is Map)
+            ? decoded.cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final dynamic userRaw = data['usuario'] ?? data;
+        final Map<String, dynamic> userMap = (userRaw is Map)
+            ? userRaw.cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final usuario = UsuarioModel.fromJson(userMap);
 
         // Guardar sesión en el teléfono
         final prefs = await SharedPreferences.getInstance();
@@ -46,33 +55,22 @@ class AuthService {
 
         return {'exito': true, 'usuario': usuario};
       } else {
-        final error = jsonDecode(response.body);
+        String mensajeError = 'Credenciales incorrectas.';
+        try {
+          final error = jsonDecode(response.body);
+          if (error is Map && error['mensaje'] != null) {
+            mensajeError = error['mensaje'].toString();
+          }
+        } catch (_) {}
         return {
           'exito': false,
-          'mensaje': error['mensaje'] ?? 'Credenciales incorrectas.',
+          'mensaje': mensajeError,
         };
       }
     } catch (e) {
-      // Modo desarrollo / respaldo si el backend aún no está corriendo
-      const mariaRealId = '1e8a6250-74bc-4055-8e7e-cd0c9d4b9d4e';
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyUsuarioId, mariaRealId);
-      await prefs.setString(_keyRol, 'cuidador');
-      await prefs.setString('usuario_nombre', 'Maria');
-      await prefs.setString('usuario_apellidos', 'Garcia');
-      await prefs.setString('usuario_correo', correo.isNotEmpty ? correo : 'maria.cuidadora@vitalbridge.com');
-
       return {
-        'exito': true,
-        'modoSimulacion': true,
-        'mensaje': 'Modo desarrollo: sesión simulada correctamente.',
-        'usuario': UsuarioModel(
-          id: mariaRealId,
-          nombre: 'Maria',
-          apellidos: 'Garcia',
-          correo: correo.isNotEmpty ? correo : 'maria.cuidadora@vitalbridge.com',
-          telefono: '+52 664 123 4567',
-        ),
+        'exito': false,
+        'mensaje': 'Fallo al conectar con el servidor: $e',
       };
     }
   }

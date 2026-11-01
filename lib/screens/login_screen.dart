@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
@@ -98,8 +98,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al conectar: '),
+          content: Text('Error: $e'),
           backgroundColor: AppColors.terracota,
+          duration: const Duration(seconds: 4),
         ),
       );
     } finally {

@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/alerta_sos_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
 
@@ -13,30 +15,86 @@ class AlertasService {
       fechaCreacion: DateTime.now().subtract(const Duration(minutes: 5)),
       idEstadoAlerta: 1,
       estado: 'Activa',
+      latitud: 19.432608,
+      longitud: -99.133209,
     ),
   ];
 
-  /// Emite una señal de emergencia SOS desde el modo paciente
+  /// Obtiene los headers con autenticación almacenada
+  static Future<Map<String, String>> _obtenerHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token') ?? '';
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
+
+    return {
+      'Content-Type': 'application/json',
+      if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (usuarioId.isNotEmpty) 'X-User-Id': usuarioId,
+    };
+  }
+
+  /// Obtiene la ubicación GPS real del dispositivo (con solicitud de permisos nativos)
+  static Future<Position?> obtenerUbicacionGpsActual() async {
+    try {
+      bool servicioHabilitado = await Geolocator.isLocationServiceEnabled();
+      if (!servicioHabilitado) {
+        return null;
+      }
+
+      LocationPermission permiso = await Geolocator.checkPermission();
+      if (permiso == LocationPermission.denied) {
+        permiso = await Geolocator.requestPermission();
+        if (permiso == LocationPermission.denied) {
+          return null;
+        }
+      }
+
+      if (permiso == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Emite una señal de emergencia SOS desde el modo paciente con geolocalización satelital
   static Future<Map<String, dynamic>> emitirAlertaSos({
     required String idPaciente,
     double? latitud,
     double? longitud,
     String? motivo,
   }) async {
+    // Si no se proveyeron coordenadas, capturar la posición GPS en vivo del dispositivo
+    if (latitud == null || longitud == null) {
+      final pos = await obtenerUbicacionGpsActual();
+      if (pos != null) {
+        latitud = pos.latitude;
+        longitud = pos.longitude;
+      }
+    }
+
     try {
+      final headers = await _obtenerHeaders();
       final response = await http
           .post(
             Uri.parse(ApiConstants.emitirAlertaSOS),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode({
               'idPaciente': idPaciente,
-              'fechaCreacion': DateTime.now().toIso8601String(),
-              'latitud': latitud ?? 19.432608,
-              'longitud': longitud ?? -99.133209,
+              'fechaCreacion': DateTime.now().toUtc().toIso8601String(),
+              'latitud': latitud,
+              'longitud': longitud,
               'motivo': motivo ?? 'Botón de pánico presionado por el paciente',
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -45,7 +103,7 @@ class AlertasService {
         return {'exito': true, 'alerta': nueva};
       }
     } catch (_) {
-      // Modo desarrollo
+      // Modo desarrollo / offline
     }
 
     final simulada = AlertaSosModel(
@@ -55,6 +113,8 @@ class AlertasService {
       fechaCreacion: DateTime.now(),
       idEstadoAlerta: 1,
       estado: 'Activa',
+      latitud: latitud,
+      longitud: longitud,
     );
     _alertasSimuladas.insert(0, simulada);
     return {'exito': true, 'modoSimulacion': true, 'alerta': simulada};
@@ -63,9 +123,10 @@ class AlertasService {
   /// Obtiene las alertas activas pendientes de atención para el cuidador
   static Future<List<AlertaSosModel>> obtenerAlertasActivas() async {
     try {
+      final headers = await _obtenerHeaders();
       final response = await http
-          .get(Uri.parse(ApiConstants.alertasActivas))
-          .timeout(const Duration(seconds: 5));
+          .get(Uri.parse(ApiConstants.alertasActivas), headers: headers)
+          .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
@@ -80,14 +141,15 @@ class AlertasService {
   /// Marca una alerta como atendida o resuelta
   static Future<bool> resolverAlerta(int idAlerta, {String resolucion = 'Atendida'}) async {
     try {
+      final headers = await _obtenerHeaders();
       final response = await http
           .post(
             Uri.parse(ApiConstants.resolverAlerta),
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode({
               'idAlerta': idAlerta,
               'resolucion': resolucion,
-              'fechaResolucion': DateTime.now().toIso8601String(),
+              'fechaResolucion': DateTime.now().toUtc().toIso8601String(),
             }),
           )
           .timeout(const Duration(seconds: 5));
@@ -115,8 +177,9 @@ class AlertasService {
         fechaCreacion: a.fechaCreacion,
         idEstadoAlerta: 2,
         estado: resolucion,
+        latitud: a.latitud,
+        longitud: a.longitud,
       );
     }
   }
 }
-

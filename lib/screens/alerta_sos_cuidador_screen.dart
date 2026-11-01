@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
@@ -8,6 +8,9 @@ class AlertaSosCuidadorScreen extends StatefulWidget {
   final String parentesco;
   final String telefono;
   final String horaAlerta;
+  final int? idAlerta;
+  final double? latitud;
+  final double? longitud;
 
   const AlertaSosCuidadorScreen({
     super.key,
@@ -16,6 +19,9 @@ class AlertaSosCuidadorScreen extends StatefulWidget {
     this.parentesco = 'Padre',
     this.telefono = '+34 610 345 872',
     this.horaAlerta = '10:45 AM',
+    this.idAlerta,
+    this.latitud,
+    this.longitud,
   });
 
   @override
@@ -176,7 +182,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               elevation: 0,
             ),
             onPressed: () {
-              AlertasService.resolverAlerta(1, resolucion: 'Atendida');
+              AlertasService.resolverAlerta(widget.idAlerta ?? 1, resolucion: 'Atendida');
               Navigator.pop(context); // Cierra diálogo
               Navigator.pop(context); // Cierra pantalla de alerta SOS y regresa al dashboard
               ScaffoldMessenger.of(context).showSnackBar(
@@ -725,4 +731,3 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
     );
   }
 }
-

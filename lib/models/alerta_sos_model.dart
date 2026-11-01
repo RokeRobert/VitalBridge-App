@@ -7,6 +7,8 @@ class AlertaSosModel {
   final DateTime fechaCreacion;
   final int idEstadoAlerta; // 1: Activa, 2: Atendida, 3: Falsa Alarma
   final String estado;
+  final double? latitud;
+  final double? longitud;
 
   AlertaSosModel({
     required this.id,
@@ -15,6 +17,8 @@ class AlertaSosModel {
     required this.fechaCreacion,
     this.idEstadoAlerta = 1,
     this.estado = 'Activa',
+    this.latitud,
+    this.longitud,
   });
 
   bool get esActiva => idEstadoAlerta == 1 || estado.toLowerCase() == 'activa';
@@ -23,6 +27,14 @@ class AlertaSosModel {
     final hora = fechaCreacion.hour.toString().padLeft(2, '0');
     final min = fechaCreacion.minute.toString().padLeft(2, '0');
     return '$hora:$min';
+  }
+
+  /// Genera un enlace directo a Google Maps con las coordenadas del paciente
+  String? get enlaceGoogleMaps {
+    if (latitud != null && longitud != null) {
+      return 'https://www.google.com/maps/search/?api=1&query=$latitud,$longitud';
+    }
+    return null;
   }
 
   factory AlertaSosModel.fromJson(Map<String, dynamic> json) {
@@ -42,6 +54,8 @@ class AlertaSosModel {
               (json['estadoAlerta'] is Map ? json['estadoAlerta']['nombreEstado'] : null) ??
               'Activa')
           .toString(),
+      latitud: double.tryParse((json['latitud'] ?? json['latitude'] ?? '').toString()),
+      longitud: double.tryParse((json['longitud'] ?? json['longitude'] ?? '').toString()),
     );
   }
 
@@ -51,7 +65,8 @@ class AlertaSosModel {
       'idPaciente': idPaciente,
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'idEstadoAlerta': idEstadoAlerta,
+      if (latitud != null) 'latitud': latitud,
+      if (longitud != null) 'longitud': longitud,
     };
   }
 }
-

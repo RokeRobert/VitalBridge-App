@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/screens/registro_screen.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
+import 'package:vital_bridge/screens/escaner_qr_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -216,13 +217,44 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('📷 Cámara lista: QR escaneado con éxito (Simulado)'),
-                        backgroundColor: AppColors.moradoOscuro,
-                      ),
+                  onPressed: () async {
+                    final codigo = await Navigator.of(context).push<String>(
+                      MaterialPageRoute(builder: (context) => const EscanerQrScreen()),
                     );
+
+                    if (codigo != null && codigo.isNotEmpty) {
+                      _tokenController.text = codigo;
+                      setModalState(() => cargandoToken = true);
+
+                      final res = await AuthService.loginPacienteConToken(token: codigo);
+                      if (!mounted || !modalContext.mounted) return;
+                      setModalState(() => cargandoToken = false);
+
+                      if (res['exito'] == true) {
+                        if (Navigator.canPop(modalContext)) {
+                          Navigator.pop(modalContext);
+                        }
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '✅ ¡Código QR escaneado con éxito! Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
+                            ),
+                            backgroundColor: const Color(0xFF336C60),
+                          ),
+                        );
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const PacienteScreen()),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(res['mensaje'] ?? 'Código QR inválido o expirado.'),
+                            backgroundColor: AppColors.terracota,
+                          ),
+                        );
+                      }
+                    }
                   },
                   icon: const Icon(Icons.qr_code_2_rounded, color: AppColors.moradoOscuro, size: 20),
                   label: const Text(

@@ -715,7 +715,14 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => const AlertaSosCuidadorScreen(),
+                    builder: (context) => AlertaSosCuidadorScreen(
+                      nombrePaciente: _pacienteSeleccionado != null
+                          ? ' '.trim()
+                          : 'Roberto Gómez',
+                      idPaciente: _pacienteSeleccionado?.id ?? '0045',
+                      parentesco: _pacienteSeleccionado?.parentesco ?? 'Familiar',
+                      telefono: _pacienteSeleccionado?.telefono ?? '+34 610 345 872',
+                    ),
                   ),
                 );
               },
@@ -1367,7 +1374,14 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
                       onPressed: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => const AlertaSosCuidadorScreen(),
+                            builder: (context) => AlertaSosCuidadorScreen(
+                      nombrePaciente: _pacienteSeleccionado != null
+                          ? ' '.trim()
+                          : 'Roberto Gómez',
+                      idPaciente: _pacienteSeleccionado?.id ?? '0045',
+                      parentesco: _pacienteSeleccionado?.parentesco ?? 'Familiar',
+                      telefono: _pacienteSeleccionado?.telefono ?? '+34 610 345 872',
+                    ),
                           ),
                         );
                       },

@@ -86,6 +86,9 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
       onCambio: () {
         if (mounted) {
           _cargarPacientes();
+        }
+      },
+    );
 
     _canalAlertas = SupabaseService.escucharTabla(
       canalNombre: 'realtime-cuidador-alertas',
@@ -93,9 +96,6 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
       onCambio: () {
         if (mounted) {
           _verificarAlertaSosEntrante();
-        }
-      },
-    );
         }
       },
     );

@@ -65,33 +65,47 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _cargandoCuidador = true);
 
-    final res = await AuthService.loginCuidador(
-      correo: correo,
-      password: password,
-    );
+    try {
+      final res = await AuthService.loginCuidador(
+        correo: correo,
+        password: password,
+      );
 
-    if (!mounted) return;
-    setState(() => _cargandoCuidador = false);
+      if (!mounted) return;
 
-    if (res['exito'] == true) {
+      if (res['exito'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['modoSimulacion'] == true
+                ? '✅ Sesión iniciada (Modo desarrollo / offline)'
+                : '✅ Bienvenido a VitalBridge'),
+            backgroundColor: const Color(0xFF336C60),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['mensaje'] ?? 'Error al iniciar sesión'),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(res['modoSimulacion'] == true
-              ? '✅ Sesión iniciada (Modo desarrollo / offline)'
-              : '✅ Bienvenido a VitalBridge'),
-          backgroundColor: const Color(0xFF336C60),
-        ),
-      );
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res['mensaje'] ?? 'Error al iniciar sesión'),
+          content: Text('Error al conectar: '),
           backgroundColor: AppColors.terracota,
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _cargandoCuidador = false);
+      }
     }
   }
 

@@ -13,6 +13,7 @@ import 'package:vital_bridge/screens/registro_paciente_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
+import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
@@ -40,6 +41,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
   RealtimeChannel? _canalTomas;
   RealtimeChannel? _canalTratamientos;
   RealtimeChannel? _canalPacientes;
+  RealtimeChannel? _canalAlertas;
 
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
     _canalTomas?.unsubscribe();
     _canalTratamientos?.unsubscribe();
     _canalPacientes?.unsubscribe();
+    _canalAlertas?.unsubscribe();
     super.dispose();
   }
 
@@ -83,9 +86,90 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
       onCambio: () {
         if (mounted) {
           _cargarPacientes();
+
+    _canalAlertas = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-cuidador-alertas',
+      tabla: 'alerta',
+      onCambio: () {
+        if (mounted) {
+          _verificarAlertaSosEntrante();
         }
       },
     );
+        }
+      },
+    );
+  }
+
+  
+  Future<void> _verificarAlertaSosEntrante() async {
+    try {
+      final alertas = await AlertasService.obtenerAlertasActivas();
+      if (!mounted || alertas.isEmpty) return;
+
+      final masReciente = alertas.first;
+
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogCtx) => AlertDialog(
+          backgroundColor: const Color(0xFFFEECEB),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Row(
+            children: [
+              Icon(Icons.crisis_alert_rounded, color: Color(0xFFE25C54), size: 30),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '🚨 ¡EMERGENCIA SOS!',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFFE25C54),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            'El paciente ' + (masReciente.nombrePaciente ?? 'asignado') + ' ha presionado el botón de auxilio SOS.\n\nSe requiere tu atención de inmediato.',
+            style: const TextStyle(fontSize: 15, color: Color(0xFF1E293B)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogCtx),
+              child: const Text('Ignorar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE25C54),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              onPressed: () {
+                Navigator.pop(dialogCtx);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => AlertaSosCuidadorScreen(
+                      idAlerta: masReciente.id,
+                      nombrePaciente: masReciente.nombrePaciente ?? 'Paciente',
+                      idPaciente: masReciente.idPaciente,
+                      latitud: masReciente.latitud,
+                      longitud: masReciente.longitud,
+                      horaAlerta: masReciente.horaLegible,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              label: const Text('Ver Alerta y Ubicación', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> _cargarPacientes() async {

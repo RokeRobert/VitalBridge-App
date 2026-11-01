@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/material.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
@@ -29,6 +32,57 @@ class AlertaSosCuidadorScreen extends StatefulWidget {
 }
 
 class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
+  late final AudioPlayer _audioPlayer;
+  Timer? _vibracionTimer;
+  bool _sirenaActiva = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _iniciarSirena();
+  }
+
+  @override
+  void dispose() {
+    _detenerSirena();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _iniciarSirena() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(AssetSource('sounds/sos_sirena.wav'));
+
+      _vibracionTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
+        if (_sirenaActiva) {
+          HapticFeedback.heavyImpact();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _detenerSirena() {
+    _sirenaActiva = false;
+    _vibracionTimer?.cancel();
+    _vibracionTimer = null;
+    try {
+      _audioPlayer.stop();
+    } catch (_) {}
+  }
+
+  void _silenciarSirena() {
+    _detenerSirena();
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🔇 Sirena de emergencia silenciada.'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
   void _llamarPaciente() {
     showDialog(
       context: context,
@@ -182,6 +236,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               elevation: 0,
             ),
             onPressed: () {
+              _detenerSirena();
               AlertasService.resolverAlerta(widget.idAlerta ?? 1, resolucion: 'Atendida');
               Navigator.pop(context); // Cierra diálogo
               Navigator.pop(context); // Cierra pantalla de alerta SOS y regresa al dashboard
@@ -317,6 +372,15 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  // Botón para silenciar sirena
+                  IconButton(
+                    icon: Icon(
+                      _sirenaActiva ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      color: _sirenaActiva ? const Color(0xFFE25C54) : Colors.grey,
+                    ),
+                    tooltip: 'Silenciar sirena',
+                    onPressed: _silenciarSirena,
+                  ),
                   // Botón provisional de regreso a la izquierda
                   Container(
                     width: 42,

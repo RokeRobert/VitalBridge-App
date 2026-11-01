@@ -1,3 +1,5 @@
+﻿import 'dart:async';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
@@ -27,7 +29,47 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
   bool _tomaConfirmada = false;
   bool _confirmando = false;
 
+  late final AudioPlayer _audioPlayer;
+  Timer? _vibracionTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _audioPlayer = AudioPlayer();
+    _iniciarAlarmaSonido();
+  }
+
+  @override
+  void dispose() {
+    _detenerAlarmaSonido();
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _iniciarAlarmaSonido() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.play(AssetSource('sounds/alarma.wav'));
+
+      _vibracionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        if (_alarmaSonando) {
+          HapticFeedback.vibrate();
+        }
+      });
+    } catch (_) {}
+  }
+
+  void _detenerAlarmaSonido() {
+    _vibracionTimer?.cancel();
+    _vibracionTimer = null;
+    try {
+      _audioPlayer.stop();
+    } catch (_) {}
+  }
+
   void _silenciarAlarma() {
+    _detenerAlarmaSonido();
     setState(() {
       _alarmaSonando = false;
     });
@@ -57,7 +99,8 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
       _confirmando = false;
       _tomaConfirmada = exito;
       if (exito) {
-        _alarmaSonando = false; // Al confirmar la toma también se apaga la alarma
+        _detenerAlarmaSonido();
+        _alarmaSonando = false;
       }
     });
 
@@ -74,13 +117,13 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
     );
   }
 
-  // Cierra la aplicación por completo devolviendo al usuario a su pantalla de inicio o app anterior
   void _cerrarAplicacion() {
+    _detenerAlarmaSonido();
     SystemNavigator.pop();
   }
 
-  // Solo regresa a la pantalla anterior (útil durante el diseño y pruebas)
   void _volverModoPrueba() {
+    _detenerAlarmaSonido();
     Navigator.of(context).maybePop(_tomaConfirmada);
   }
 

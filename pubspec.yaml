@@ -98,4 +98,5 @@ flutter:
 
 dependency_overrides:
   path_provider_foundation: 2.4.1
-  shared_preferences_android: 2.5.4
+  shared_preferences_android: 2.5.0
+

@@ -1,8 +1,8 @@
 // ============================================================================
 // CONFIGURACIÓN DE RUTAS Y CONSTANTES DE RED (api_constants.dart)
 // ============================================================================
-// Centraliza todas las URLs y endpoints de la API REST para evitar tener
-// direcciones "quemadas" (hardcoded) dispersas en el código.
+// Centraliza todas las URLs y endpoints de la API REST para conectar la app
+// móvil con el backend en la nube o en desarrollo local.
 // ============================================================================
 
 import 'dart:io' show Platform;
@@ -10,19 +10,23 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiConstants {
   // --------------------------------------------------------------------------
-  // URL BASE DINÁMICA
+  // URL PÚBLICA EN LA NUBE (Render con HTTPS)
   // --------------------------------------------------------------------------
-  // ¿Por qué usamos 10.0.2.2 en Android?
-  // El Emulador de Android funciona dentro de una red virtual aislada.
-  // Su 'localhost' (127.0.0.1) apunta a sí mismo (al teléfono virtual).
-  // La IP '10.0.2.2' es un alias reservado por Google que conecta directamente
-  // con el 'localhost' de tu computadora física donde corre el backend en el puerto 5113.
+  static const String nubeUrl = 'https://vitalbridge-backend-vl2w.onrender.com/api';
+
+  // Cambiar a 'true' solo si se desea probar con backend local en localhost:5113
+  static const bool usarServidorLocal = false;
+
+  /// Retorna la URL base correspondiente (por defecto en la nube pública)
   static String get baseUrl {
-    if (kIsWeb) return 'http://localhost:5113/api';
-    try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:5113/api';
-    } catch (_) {}
-    return 'http://localhost:5113/api'; // Si corre en Windows Desktop o pruebas locales
+    if (usarServidorLocal) {
+      if (kIsWeb) return 'http://localhost:5113/api';
+      try {
+        if (Platform.isAndroid) return 'http://10.0.2.2:5113/api';
+      } catch (_) {}
+      return 'http://localhost:5113/api';
+    }
+    return nubeUrl;
   }
 
   // --- Endpoints de Autenticación (/api/auth) ---

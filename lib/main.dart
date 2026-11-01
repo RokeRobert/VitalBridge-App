@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
+import 'package:vital_bridge/services/supabase_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SupabaseService.inicializar();
   runApp(const VitalBridgeApp());
 }
 

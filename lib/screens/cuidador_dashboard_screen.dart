@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -13,6 +13,8 @@ import 'package:vital_bridge/screens/registro_paciente_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
+import 'package:vital_bridge/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class CuidadorDashboardScreen extends StatefulWidget {
@@ -34,10 +36,56 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
   List<TomaModel> _tomasHoy = [];
   bool _cargandoTomas = false;
 
+  // Canales de suscripción en tiempo real
+  RealtimeChannel? _canalTomas;
+  RealtimeChannel? _canalTratamientos;
+  RealtimeChannel? _canalPacientes;
+
   @override
   void initState() {
     super.initState();
     _cargarPacientes();
+    _iniciarRealtime();
+  }
+
+  @override
+  void dispose() {
+    _canalTomas?.unsubscribe();
+    _canalTratamientos?.unsubscribe();
+    _canalPacientes?.unsubscribe();
+    super.dispose();
+  }
+
+  void _iniciarRealtime() {
+    _canalTomas = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-cuidador-tomas',
+      tabla: 'toma',
+      onCambio: () {
+        if (mounted && _pacienteSeleccionado != null) {
+          _cargarTomasHoy();
+        }
+      },
+    );
+
+    _canalTratamientos = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-cuidador-tratamientos',
+      tabla: 'tratamiento',
+      onCambio: () {
+        if (mounted && _pacienteSeleccionado != null) {
+          _cargarTomasHoy();
+        }
+      },
+    );
+
+    _canalPacientes = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-cuidador-pacientes',
+      tabla: 'paciente',
+      onCambio: () {
+        if (mounted) {
+          _cargarPacientes();
+        }
+      },
+    );
   }
 
   Future<void> _cargarPacientes() async {

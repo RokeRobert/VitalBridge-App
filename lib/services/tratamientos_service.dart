@@ -7,6 +7,11 @@ import 'package:vital_bridge/services/api_constants.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 
 class TratamientosService {
+  // Constantes de persistencia local offline
+  static const String _keyCacheTratamientos = 'cache_tratamientos_json';
+  static const String _keyCacheTomasHoy = 'cache_tomas_hoy_json';
+  static const String _keyColaTomasPendientes = 'cola_tomas_pendientes_json';
+
   // Lista en memoria para modo desarrollo / simulación sin backend encendido
   static final List<TratamientoModel> _tratamientosSimulados = [
     TratamientoModel(
@@ -95,7 +100,7 @@ class TratamientosService {
     ),
   ];
 
-  // Registro de tomas confirmadas para persistencia en sesión
+  // Registro de tomas confirmadas en memoria volátil
   static final Map<int, DateTime> _tomasConfirmadasMap = {};
 
   /// Obtiene los headers de autenticación almacenados
@@ -109,6 +114,41 @@ class TratamientosService {
       if (token.isNotEmpty) 'Authorization': 'Bearer $token',
       if (usuarioId.isNotEmpty) 'X-User-Id': usuarioId,
     };
+  }
+
+  /// Sincroniza en segundo plano cualquier toma pendiente de la cola offline
+  static Future<void> sincronizarTomasPendientes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final colaJson = prefs.getString(_keyColaTomasPendientes);
+    if (colaJson == null || colaJson.isEmpty) return;
+
+    try {
+      final List<dynamic> pendientes = jsonDecode(colaJson);
+      if (pendientes.isEmpty) return;
+
+      final headers = await _obtenerHeaders();
+      final List<dynamic> noSincronizadas = [];
+
+      for (var item in pendientes) {
+        try {
+          final res = await http
+              .post(
+                Uri.parse(ApiConstants.confirmarToma),
+                headers: headers,
+                body: jsonEncode(item),
+              )
+              .timeout(const Duration(seconds: 5));
+
+          if (res.statusCode != 200 && res.statusCode != 204) {
+            noSincronizadas.add(item);
+          }
+        } catch (_) {
+          noSincronizadas.add(item);
+        }
+      }
+
+      await prefs.setString(_keyColaTomasPendientes, jsonEncode(noSincronizadas));
+    } catch (_) {}
   }
 
   /// Obtiene los tratamientos registrados para el paciente consultando la API en C#
@@ -131,7 +171,7 @@ class TratamientosService {
         // Actualizar respaldo en memoria y caché local
         _tratamientosSimulados.clear();
         _tratamientosSimulados.addAll(lista);
-        await prefs.setString('cache_tratamientos_json', jsonEncode(data));
+        await prefs.setString(_keyCacheTratamientos, jsonEncode(data));
 
         return lista;
       }
@@ -141,7 +181,7 @@ class TratamientosService {
     }
 
     // Respaldo de persistencia local en caché si la API no está disponible
-    final cacheJson = prefs.getString('cache_tratamientos_json');
+    final cacheJson = prefs.getString(_keyCacheTratamientos);
     if (cacheJson != null && cacheJson.isNotEmpty) {
       try {
         final List decoded = jsonDecode(cacheJson);
@@ -253,7 +293,6 @@ class TratamientosService {
 
   /// Elimina un tratamiento por su ID (Borrado lógico en el backend y reflejo inmediato)
   static Future<bool> eliminarTratamiento(int id) async {
-    // 1. Obtener datos del medicamento antes de borrarlo de memoria
     final index = _tratamientosSimulados.indexWhere((t) => t.id == id);
     String medicamentoBorrado = '';
     if (index != -1) {
@@ -261,8 +300,6 @@ class TratamientosService {
       _tratamientosSimulados.removeAt(index);
     }
 
-    // 2. Eliminar de inmediato las tomas del día asociadas para que
-    // el paciente deje de ver las tomas de este medicamento de inmediato.
     _tomasHoySimuladas.removeWhere((toma) {
       final coincideId = toma.idTratamiento == id;
       final coincideNombre = medicamentoBorrado.isNotEmpty &&
@@ -292,8 +329,13 @@ class TratamientosService {
     }
   }
 
-  /// Obtiene la lista de tomas programadas para hoy para un paciente específico
+  /// Obtiene la lista de tomas programadas para hoy para un paciente específico (con soporte Offline-First)
   static Future<List<TomaModel>> obtenerTomasHoy({String? pacienteId}) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Intentar sincronizar tomas pendientes que se hayan marcado offline
+    sincronizarTomasPendientes();
+
     try {
       pacienteId ??= await AuthService.obtenerUsuarioId();
       final headers = await _obtenerHeaders();
@@ -308,6 +350,9 @@ class TratamientosService {
         final List data = jsonDecode(response.body);
         if (data.isNotEmpty) {
           final tomasDesdeApi = data.map((item) => TomaModel.fromJson(item)).toList();
+
+          // Guardar copia exacta en disco local para modo offline
+          await prefs.setString(_keyCacheTomasHoy, jsonEncode(data));
           return tomasDesdeApi;
         }
       }
@@ -316,31 +361,49 @@ class TratamientosService {
       print('Aviso: modo offline para tomas: $e');
     }
 
-    // Respaldo en memoria / offline:
+    // 1. Respaldo de persistencia local en caché (datos de la última sincronización)
+    final cacheTomasJson = prefs.getString(_keyCacheTomasHoy);
+    if (cacheTomasJson != null && cacheTomasJson.isNotEmpty) {
+      try {
+        final List decoded = jsonDecode(cacheTomasJson);
+        final tomasEnCache = decoded.map((item) => TomaModel.fromJson(item)).toList();
+
+        // Aplicar estado de tomas confirmadas localmente mientras estuvo offline
+        final colaJson = prefs.getString(_keyColaTomasPendientes);
+        if (colaJson != null && colaJson.isNotEmpty) {
+          final List pendientes = jsonDecode(colaJson);
+          for (var p in pendientes) {
+            final id = p['idHorario'];
+            final index = tomasEnCache.indexWhere((t) => t.idHorario == id);
+            if (index != -1) {
+              tomasEnCache[index] = tomasEnCache[index].copyWith(
+                estado: 'Tomada',
+                horaTomada: DateTime.tryParse(p['horaTomada'].toString()) ?? DateTime.now(),
+              );
+            }
+          }
+        }
+
+        return tomasEnCache;
+      } catch (_) {}
+    }
+
+    // 2. Respaldo secundario: Reconstruir a partir de tratamientos en caché
     final tratamientos = await obtenerTratamientos(pacienteId: pacienteId);
-    if (tratamientos.isEmpty) return [];
+    if (tratamientos.isNotEmpty) {
+      final List<TomaModel> tomasPaciente = [];
 
-    final List<TomaModel> tomasPaciente = [];
+      for (var trat in tratamientos) {
+        if (!trat.activo) continue;
 
-    for (var trat in tratamientos) {
-      if (!trat.activo) continue;
+        final horarios = trat.horarios.isNotEmpty ? trat.horarios : ['08:00 AM'];
 
-      final horarios = trat.horarios.isNotEmpty ? trat.horarios : ['08:00 AM'];
+        for (int i = 0; i < horarios.length; i++) {
+          final hora = horarios[i];
+          final idHorario = trat.id * 100 + i + 1;
+          final horaConfirmada = _tomasConfirmadasMap[idHorario];
+          final esTomada = horaConfirmada != null;
 
-      for (int i = 0; i < horarios.length; i++) {
-        final hora = horarios[i];
-        final idHorario = trat.id * 100 + i + 1;
-        final horaConfirmada = _tomasConfirmadasMap[idHorario];
-        final esTomada = horaConfirmada != null;
-
-        // Verificar si ya fue marcada como tomada en _tomasHoySimuladas
-        final previaIndex = _tomasHoySimuladas.indexWhere(
-          (t) => t.idTratamiento == trat.id && t.horaProgramada == hora,
-        );
-
-        if (previaIndex != -1) {
-          tomasPaciente.add(_tomasHoySimuladas[previaIndex]);
-        } else {
           tomasPaciente.add(
             TomaModel(
               idHorario: idHorario,
@@ -355,26 +418,58 @@ class TratamientosService {
           );
         }
       }
+
+      tomasPaciente.sort((a, b) => a.horaProgramada.compareTo(b.horaProgramada));
+      return tomasPaciente;
     }
 
-    // Ordenar cronológicamente por hora programada
-    tomasPaciente.sort((a, b) => a.horaProgramada.compareTo(b.horaProgramada));
-    return tomasPaciente;
+    return List.from(_tomasHoySimuladas);
   }
 
-  /// Marca una toma como realizada (confirmada por paciente o cuidador)
+  /// Marca una toma como realizada (confirmada por paciente o cuidador) con cola de sincronización offline
   static Future<bool> confirmarToma(int idHorario, {String? observaciones}) async {
+    final ahoraUtc = DateTime.now().toUtc();
     _tomasConfirmadasMap[idHorario] = DateTime.now();
     _actualizarTomaSimulada(idHorario);
 
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Guardar en cola de pendientes local para garantizar persistencia sin red
+    final body = {
+      'idHorario': idHorario,
+      'horaTomada': ahoraUtc.toIso8601String(),
+      if (observaciones != null) 'observaciones': observaciones,
+    };
+
+    List<dynamic> pendientes = [];
+    final colaPrevia = prefs.getString(_keyColaTomasPendientes);
+    if (colaPrevia != null && colaPrevia.isNotEmpty) {
+      try {
+        pendientes = jsonDecode(colaPrevia);
+      } catch (_) {}
+    }
+    pendientes.removeWhere((item) => item['idHorario'] == idHorario);
+    pendientes.add(body);
+    await prefs.setString(_keyColaTomasPendientes, jsonEncode(pendientes));
+
+    // 2. Actualizar también la caché de tomas locales en disco
+    final cacheTomasJson = prefs.getString(_keyCacheTomasHoy);
+    if (cacheTomasJson != null && cacheTomasJson.isNotEmpty) {
+      try {
+        final List decoded = jsonDecode(cacheTomasJson);
+        for (var item in decoded) {
+          if (item['idHorario'] == idHorario) {
+            item['estado'] = 'Tomada';
+            item['horaTomada'] = ahoraUtc.toIso8601String();
+          }
+        }
+        await prefs.setString(_keyCacheTomasHoy, jsonEncode(decoded));
+      } catch (_) {}
+    }
+
+    // 3. Intentar transmitir de inmediato al backend si hay internet
     try {
       final headers = await _obtenerHeaders();
-      final Map<String, dynamic> body = {
-        'idHorario': idHorario,
-        'horaTomada': DateTime.now().toUtc().toIso8601String(),
-        if (observaciones != null) 'observaciones': observaciones,
-      };
-
       final response = await http
           .post(
             Uri.parse(ApiConstants.confirmarToma),
@@ -384,11 +479,14 @@ class TratamientosService {
           .timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
+        // Confirmación exitosa en servidor: remover de la cola de pendientes
+        pendientes.removeWhere((item) => item['idHorario'] == idHorario);
+        await prefs.setString(_keyColaTomasPendientes, jsonEncode(pendientes));
         return true;
       }
     } catch (e) {
       // ignore: avoid_print
-      print('Aviso: la toma se confirmó localmente: $e');
+      print('Aviso: la toma se confirmó localmente en cola offline: $e');
     }
 
     return true;

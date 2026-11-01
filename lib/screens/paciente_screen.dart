@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
@@ -9,6 +9,8 @@ import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
+import 'package:vital_bridge/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 class PacienteScreen extends StatefulWidget {
   const PacienteScreen({super.key});
 
@@ -23,17 +25,58 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   String? _idPaciente;
   final Set<int> _tomasEnProceso = {};
 
+  // Canales en tiempo real de Supabase
+  RealtimeChannel? _canalTratamientos;
+  RealtimeChannel? _canalHorarios;
+  RealtimeChannel? _canalTomas;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _cargarDatosIniciales();
+    _iniciarRealtime();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _canalTratamientos?.unsubscribe();
+    _canalHorarios?.unsubscribe();
+    _canalTomas?.unsubscribe();
     super.dispose();
+  }
+
+  void _iniciarRealtime() {
+    _canalTratamientos = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-paciente-tratamientos',
+      tabla: 'tratamiento',
+      onCambio: () {
+        if (mounted) {
+          _cargarTomasHoy();
+        }
+      },
+    );
+
+    _canalHorarios = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-paciente-horarios',
+      tabla: 'horario',
+      onCambio: () {
+        if (mounted) {
+          _cargarTomasHoy();
+        }
+      },
+    );
+
+    _canalTomas = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-paciente-tomas',
+      tabla: 'toma',
+      onCambio: () {
+        if (mounted) {
+          _cargarTomasHoy();
+        }
+      },
+    );
   }
 
   @override

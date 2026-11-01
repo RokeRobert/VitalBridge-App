@@ -1,9 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/screens/agregar_medicamento_screen.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
+import 'package:vital_bridge/services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class TratamientosScreen extends StatefulWidget {
   final bool mostrarBotonVolver;
@@ -31,12 +33,33 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
 
   List<TratamientoModel> _tratamientos = [];
 
+  RealtimeChannel? _canalTratamientos;
+
   @override
   void initState() {
     super.initState();
     _pacienteIdActual = widget.pacienteId;
     _nombrePacienteActual = widget.nombrePaciente;
     _cargarTratamientos();
+    _iniciarRealtime();
+  }
+
+  @override
+  void dispose() {
+    _canalTratamientos?.unsubscribe();
+    super.dispose();
+  }
+
+  void _iniciarRealtime() {
+    _canalTratamientos = SupabaseService.escucharTabla(
+      canalNombre: 'realtime-tratamientos-lista',
+      tabla: 'tratamiento',
+      onCambio: () {
+        if (mounted) {
+          _cargarTratamientos();
+        }
+      },
+    );
   }
 
   @override

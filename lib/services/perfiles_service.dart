@@ -1,10 +1,10 @@
-// ============================================================================
-// SERVICIO DE GESTIÓN DE PERFILES Y FOTOS (perfiles_service.dart)
+﻿// ============================================================================
+// SERVICIO DE GESTIÃ“N DE PERFILES Y FOTOS (perfiles_service.dart)
 // ============================================================================
 // Este servicio encapsula:
-// 1. Selección de imágenes (galería o cámara) usando el plugin 'image_picker'.
-// 2. Envío de imágenes binarias (MultipartRequest) hacia el Backend / Supabase.
-// 3. Consulta y actualización de datos de perfil con caché local (SharedPreferences).
+// 1. SelecciÃ³n de imÃ¡genes (galerÃ­a o cÃ¡mara) usando el plugin 'image_picker'.
+// 2. EnvÃ­o de imÃ¡genes binarias (MultipartRequest) hacia el Backend / Supabase.
+// 3. Consulta y actualizaciÃ³n de datos de perfil con cachÃ© local (SharedPreferences).
 // ============================================================================
 
 import 'dart:convert';
@@ -17,7 +17,7 @@ class PerfilesService {
   // --------------------------------------------------------------------------
   // 1. SUBIDA DE FOTO DE PERFIL A SUPABASE STORAGE MEDIANTE EL BACKEND
   // --------------------------------------------------------------------------
-  // Las imágenes no se envían como JSON regular, sino como 'multipart/form-data'.
+  // Las imÃ¡genes no se envÃ­an como JSON regular, sino como 'multipart/form-data'.
   // Esto permite transmitir secuencias de bytes binarios de forma eficiente.
   static Future<Map<String, dynamic>> subirFoto({
     required XFile archivo,
@@ -28,7 +28,7 @@ class PerfilesService {
       final uri = Uri.parse(ApiConstants.subirFotoPerfil);
       final request = http.MultipartRequest('POST', uri);
 
-      // Leemos los bytes del archivo seleccionado en el teléfono
+      // Leemos los bytes del archivo seleccionado en el telÃ©fono
       final bytes = await archivo.readAsBytes();
       final multipartFile = http.MultipartFile.fromBytes(
         'archivo',
@@ -36,19 +36,19 @@ class PerfilesService {
         filename: archivo.name.isNotEmpty ? archivo.name : 'foto.jpg',
       );
 
-      // Agregamos el archivo y los campos de formulario a la petición
+      // Agregamos el archivo y los campos de formulario a la peticiÃ³n
       request.files.add(multipartFile);
       request.fields['tipo'] = tipo;
       request.fields['id'] = id;
 
-      // Adjuntamos el token de autenticación del usuario si existe
+      // Adjuntamos el token de autenticaciÃ³n del usuario si existe
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
       if (token.isNotEmpty) {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      // Enviamos la petición con un timeout de 12 segundos
+      // Enviamos la peticiÃ³n con un timeout de 12 segundos
       final streamedResponse = await request.send().timeout(const Duration(seconds: 12));
       final response = await http.Response.fromStream(streamedResponse);
 
@@ -56,7 +56,7 @@ class PerfilesService {
         final data = jsonDecode(response.body);
         final urlFoto = data['urlFoto']?.toString();
 
-        // Si fue una foto del cuidador, actualizamos el caché local
+        // Si fue una foto del cuidador, actualizamos el cachÃ© local
         if (tipo == 'usuario' && urlFoto != null) {
           await prefs.setString('usuario_foto', urlFoto);
         }
@@ -69,7 +69,7 @@ class PerfilesService {
       }
     } catch (_) {}
 
-    // Respaldo de visualización inmediata local si el servidor no responde
+    // Respaldo de visualizaciÃ³n inmediata local si el servidor no responde
     final prefs = await SharedPreferences.getInstance();
     if (tipo == 'usuario') {
       await prefs.setString('usuario_foto', archivo.path);
@@ -83,11 +83,11 @@ class PerfilesService {
   }
 
   // --------------------------------------------------------------------------
-  // 2. SELECCIÓN DE IMAGEN DESDE LA GALERÍA
+  // 2. SELECCIÃ“N DE IMAGEN DESDE LA GALERÃA
   // --------------------------------------------------------------------------
-  // Abre la galería nativa de Android/iOS.
-  // Optimización: Redimensiona la foto a máximo 1024x1024 con 85% de calidad
-  // para que suba rápido y no consuma datos ni ancho de banda excesivo.
+  // Abre la galerÃ­a nativa de Android/iOS.
+  // OptimizaciÃ³n: Redimensiona la foto a mÃ¡ximo 1024x1024 con 85% de calidad
+  // para que suba rÃ¡pido y no consuma datos ni ancho de banda excesivo.
   static Future<XFile?> seleccionarFotoDeGaleria() async {
     try {
       final picker = ImagePicker();
@@ -103,7 +103,7 @@ class PerfilesService {
   }
 
   // --------------------------------------------------------------------------
-  // 3. CAPTURA DE FOTO CON LA CÁMARA
+  // 3. CAPTURA DE FOTO CON LA CÃMARA
   // --------------------------------------------------------------------------
   static Future<XFile?> tomarFotoConCamara() async {
     try {
@@ -122,8 +122,8 @@ class PerfilesService {
   // --------------------------------------------------------------------------
   // 4. CONSULTAR PERFIL DEL CUIDADOR
   // --------------------------------------------------------------------------
-  // Patrón "Cache-First": Intenta obtener los datos frescos de la base de datos
-  // vía la API; si no hay internet o falla, recurre a SharedPreferences.
+  // PatrÃ³n "Cache-First": Intenta obtener los datos frescos de la base de datos
+  // vÃ­a la API; si no hay internet o falla, recurre a SharedPreferences.
   static Future<Map<String, dynamic>> obtenerPerfilUsuario(String idUsuario) async {
     final prefs = await SharedPreferences.getInstance();
     try {
@@ -146,13 +146,13 @@ class PerfilesService {
       }
     } catch (_) {}
 
-    // Caché local si no hubo conexión con el backend
+    // CachÃ© local si no hubo conexiÃ³n con el backend
     return {
       'exito': true,
       'data': {
         'idUsuario': idUsuario,
-        'nombre': prefs.getString('usuario_nombre') ?? 'María',
-        'apellidos': prefs.getString('usuario_apellidos') ?? 'García',
+        'nombre': prefs.getString('usuario_nombre') ?? 'MarÃ­a',
+        'apellidos': prefs.getString('usuario_apellidos') ?? 'GarcÃ­a',
         'correo': prefs.getString('usuario_correo') ?? 'maria@vitalbridge.es',
         'telefono': prefs.getString('usuario_telefono') ?? '+34 601 234 567',
         'foto': prefs.getString('usuario_foto'),
@@ -188,7 +188,7 @@ class PerfilesService {
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        return {'exito': true, 'mensaje': 'Perfil guardado con éxito.'};
+        return {'exito': true, 'mensaje': 'Perfil guardado con Ã©xito.'};
       }
     } catch (_) {}
 
@@ -234,7 +234,7 @@ class PerfilesService {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        return {'exito': true, 'mensaje': 'Paciente actualizado con éxito.'};
+        return {'exito': true, 'mensaje': 'Paciente actualizado con Ã©xito.'};
       } else {
         // ignore: avoid_print
         print('Error actualizarPaciente status ${response.statusCode}: ${response.body}');

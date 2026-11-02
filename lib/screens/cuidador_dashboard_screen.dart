@@ -18,6 +18,7 @@ import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/fcm_service.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class CuidadorDashboardScreen extends StatefulWidget {
@@ -27,7 +28,7 @@ class CuidadorDashboardScreen extends StatefulWidget {
   State<CuidadorDashboardScreen> createState() => _CuidadorDashboardScreenState();
 }
 
-class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
+class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with WidgetsBindingObserver {
   int _tabSeleccionado = 0;
 
   // Estado dinámico de Pacientes
@@ -38,6 +39,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
   // Lista dinámica de tomas del día para el paciente supervisado
   List<TomaModel> _tomasHoy = [];
   bool _cargandoTomas = false;
+  bool _faltanPermisosAlarma = false;
 
   // Canales de suscripción en tiempo real
   RealtimeChannel? _canalTomas;
@@ -48,18 +50,58 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _cargarPacientes();
     _iniciarRealtime();
+    _verificarPermisosSistema();
     FcmService.sincronizarTokenCuidador();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _canalTomas?.unsubscribe();
     _canalTratamientos?.unsubscribe();
     _canalPacientes?.unsubscribe();
     _canalAlertas?.unsubscribe();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _verificarPermisosSistema();
+      FcmService.sincronizarTokenCuidador();
+    }
+  }
+
+  Future<void> _verificarPermisosSistema() async {
+    final tieneAparecerEncima = await AlarmasNativasService.tienePermisoAparecerEncima();
+    final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
+    final tienePantallaCompleta = await AlarmasNativasService.tienePermisoPantallaCompleta();
+    if (mounted) {
+      setState(() {
+        _faltanPermisosAlarma = !tieneAparecerEncima || !tieneAlarmasExactas || !tienePantallaCompleta;
+      });
+    }
+  }
+
+  Future<void> _solicitarPermisosAlarma() async {
+    final tieneAparecerEncima = await AlarmasNativasService.tienePermisoAparecerEncima();
+    if (!tieneAparecerEncima) {
+      await AlarmasNativasService.abrirAjustesAparecerEncima();
+      return;
+    }
+    final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
+    if (!tieneAlarmasExactas) {
+      await AlarmasNativasService.abrirAjustesAlarmasExactas();
+      return;
+    }
+    final tienePantallaCompleta = await AlarmasNativasService.tienePermisoPantallaCompleta();
+    if (!tienePantallaCompleta) {
+      await AlarmasNativasService.abrirAjustesPantallaCompleta();
+      return;
+    }
   }
 
   void _iniciarRealtime() {
@@ -500,7 +542,8 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _construirEncabezado(),
-            const SizedBox(height: 24),
+            _buildBannerPermisos(),
+            const SizedBox(height: 16),
 
             // Tarjeta Heroica de Bienvenida y Estado Vacío
             Container(
@@ -707,6 +750,87 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
     );
   }
 
+  Widget _buildBannerPermisos() {
+    if (!_faltanPermisosAlarma) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFE25C54).withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFE25C54).withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.crisis_alert_rounded,
+                color: Color(0xFFE25C54),
+                size: 24,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Aviso de alertas de auxilio SOS',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C324E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Para que la alarma de emergencia SOS encienda la pantalla de tu celular y suene a todo volumen incluso cuando esté bloqueado o con la aplicación cerrada, activa los permisos del sistema.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF555B6E),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE25C54),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _solicitarPermisosAlarma,
+              child: const Text(
+                'Activar permisos de emergencia ahora',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// VISTA ACTIVA: Cuando el cuidador ya tiene 1 o más pacientes registrados
   Widget _construirVistaMonitoreoActivo() {
     final paciente = _pacienteSeleccionado!;
@@ -799,6 +923,8 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
             ],
 
 
+
+            _buildBannerPermisos(),
 
             // Tarjeta del Paciente Supervisado
             Container(

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +18,29 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   if (data['tipo'] == 'SOS') {
     final flutterLocalNotifications = FlutterLocalNotificationsPlugin();
 
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+    await flutterLocalNotifications.initialize(settings: initSettings);
+
+    final androidPlugin = flutterLocalNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      final canal = AndroidNotificationChannel(
+        'vitalbridge_alarmas_medicas_v4',
+        'Alarmas de Medicamentos y SOS',
+        description: 'Alarmas críticas y alertas de auxilio de pacientes',
+        importance: Importance.max,
+        playSound: true,
+        sound: const RawResourceAndroidNotificationSound('alarma'),
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+      );
+      await androidPlugin.createNotificationChannel(canal);
+    }
+
     final androidDetails = AndroidNotificationDetails(
       'vitalbridge_alarmas_medicas_v4',
       'Alarmas de Medicamentos y SOS',
@@ -29,6 +53,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       sound: const RawResourceAndroidNotificationSound('alarma'),
       playSound: true,
       enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 1000, 500, 1000, 500, 1000]),
+      visibility: NotificationVisibility.public,
     );
 
     final nombre = data['nombrePaciente'] ?? 'El paciente';
@@ -69,7 +95,7 @@ class FcmService {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final data = message.data;
       if (data['tipo'] == 'SOS') {
-        _abrirPantallaAlertaSos(data);
+        abrirPantallaAlertaSos(data);
       }
     });
 
@@ -77,7 +103,7 @@ class FcmService {
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       final data = message.data;
       if (data['tipo'] == 'SOS') {
-        _abrirPantallaAlertaSos(data);
+        abrirPantallaAlertaSos(data);
       }
     });
   }
@@ -87,7 +113,7 @@ class FcmService {
     try {
       final initialMessage = await _messaging.getInitialMessage();
       if (initialMessage != null && initialMessage.data['tipo'] == 'SOS') {
-        _abrirPantallaAlertaSos(initialMessage.data);
+        abrirPantallaAlertaSos(initialMessage.data);
       }
     } catch (_) {}
   }
@@ -114,7 +140,7 @@ class FcmService {
   }
 
   /// Navega de inmediato a la pantalla de emergencia SOS en pantalla completa
-  static void _abrirPantallaAlertaSos(Map<String, dynamic> data) {
+  static void abrirPantallaAlertaSos(Map<String, dynamic> data) {
     final context = AlarmasNativasService.navigatorKey.currentContext;
     if (context == null) return;
 

@@ -8,6 +8,7 @@ import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
+import 'package:vital_bridge/services/fcm_service.dart';
 
 /// Servicio centralizado de Alarmas Nativas para el Paciente.
 /// Utiliza Android AlarmManager (AlarmClock) para despertar el dispositivo
@@ -90,15 +91,19 @@ class AlarmasNativasService {
 
   /// Manejador de evento cuando el usuario interactúa con la notificación o Android dispara el intent
   static void _alRecibirNotificacion(NotificationResponse response) {
-    if (alarmaAbierta) {
-      debugPrint('AlarmasNativas: Alarma ya en pantalla, omitiendo duplicado.');
-      return;
-    }
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
 
     try {
       final Map<String, dynamic> datos = jsonDecode(payload);
+      if (datos['tipo'] == 'SOS') {
+        FcmService.abrirPantallaAlertaSos(datos);
+        return;
+      }
+      if (alarmaAbierta) {
+        debugPrint('AlarmasNativas: Alarma ya en pantalla, omitiendo duplicado.');
+        return;
+      }
       _abrirPantallaAlarma(
         idHorario: datos['idHorario'] as int?,
         nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',

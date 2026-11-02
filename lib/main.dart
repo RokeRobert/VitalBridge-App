@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
+import 'package:vital_bridge/screens/alerta_sos_cuidador_screen.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
@@ -30,19 +31,34 @@ void main() async {
   final token = prefs.getString('auth_token');
   final rol = prefs.getString('auth_rol');
 
-  // Comprobar si la app fue lanzada al despertar por una alarma
+  // Comprobar si la app fue lanzada al despertar por una alarma o SOS
   final payloadAlarma = await AlarmasNativasService.obtenerPayloadLanzamiento();
 
   Widget pantallaInicial;
   if (payloadAlarma != null) {
-    AlarmasNativasService.alarmaAbierta = true;
-    pantallaInicial = AlarmaMedicamentoScreen(
-      idHorario: payloadAlarma['idHorario'] as int?,
-      nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',
-      dosis: payloadAlarma['dosis'] as String? ?? '',
-      hora: payloadAlarma['hora'] as String? ?? '',
-      indicaciones: payloadAlarma['indicaciones'] as String? ?? '',
-    );
+    if (payloadAlarma['tipo'] == 'SOS') {
+      final idAlerta = int.tryParse(payloadAlarma['idAlerta']?.toString() ?? '0');
+      final latitud = double.tryParse(payloadAlarma['latitud']?.toString() ?? '');
+      final longitud = double.tryParse(payloadAlarma['longitud']?.toString() ?? '');
+      final nombrePaciente = payloadAlarma['nombrePaciente']?.toString() ?? 'Paciente';
+
+      pantallaInicial = AlertaSosCuidadorScreen(
+        nombrePaciente: nombrePaciente,
+        idAlerta: idAlerta,
+        latitud: latitud,
+        longitud: longitud,
+        horaAlerta: 'Ahora',
+      );
+    } else {
+      AlarmasNativasService.alarmaAbierta = true;
+      pantallaInicial = AlarmaMedicamentoScreen(
+        idHorario: payloadAlarma['idHorario'] as int?,
+        nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',
+        dosis: payloadAlarma['dosis'] as String? ?? '',
+        hora: payloadAlarma['hora'] as String? ?? '',
+        indicaciones: payloadAlarma['indicaciones'] as String? ?? '',
+      );
+    }
   } else if (token != null && token.isNotEmpty) {
     if (rol == 'cuidador') {
       pantallaInicial = const CuidadorDashboardScreen();

@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -12,6 +12,7 @@ import 'package:vital_bridge/screens/perfil_paciente_screen.dart';
 import 'package:vital_bridge/screens/registro_paciente_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
+import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
@@ -238,8 +239,10 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 0,
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              await AuthService.cerrarSesion();
+              if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (context) => const LoginScreen()),
                 (route) => false,
@@ -793,96 +796,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
               const SizedBox(height: 14),
             ],
 
-            // Banner Provisional de Alerta SOS Entrante
-            InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => AlertaSosCuidadorScreen(
-                      nombrePaciente: _pacienteSeleccionado != null
-                          ? ' '.trim()
-                          : 'Roberto Gómez',
-                      idPaciente: _pacienteSeleccionado?.id ?? '0045',
-                      parentesco: _pacienteSeleccionado?.parentesco ?? 'Familiar',
-                      telefono: _pacienteSeleccionado?.telefono ?? '+34 610 345 872',
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFE25C54), Color(0xFFC7433B)],
-                  ),
-                  borderRadius: BorderRadius.circular(18),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFE25C54).withValues(alpha: 0.35),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Text('🚨', style: TextStyle(fontSize: 18)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Alerta SOS del Paciente',
-                                style: TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                '• EN VIVO',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFFFFD4D1),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Toca para ver pantalla de emergencia (Provisional)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFFFEE2E8),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+
 
             // Tarjeta del Paciente Supervisado
             Container(
@@ -1444,38 +1358,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
                       height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.terracota,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => AlertaSosCuidadorScreen(
-                      nombrePaciente: _pacienteSeleccionado != null
-                          ? ' '.trim()
-                          : 'Roberto Gómez',
-                      idPaciente: _pacienteSeleccionado?.id ?? '0045',
-                      parentesco: _pacienteSeleccionado?.parentesco ?? 'Familiar',
-                      telefono: _pacienteSeleccionado?.telefono ?? '+34 610 345 872',
-                    ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.crisis_alert_rounded, size: 18),
-                      label: const Text(
-                        'Simular Recepción de Alerta SOS',
-                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
+
                 ],
               ),
             ),

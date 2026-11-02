@@ -1,9 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
-import 'package:vital_bridge/screens/alerta_sos_cuidador_screen.dart';
 import 'package:vital_bridge/screens/horario_screen.dart';
+import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/auth_service.dart';
@@ -193,6 +193,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     );
   }
 
+  // ignore: unused_element
   void _abrirAlarmaParaToma(TomaModel toma) async {
     final confirmada = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
@@ -258,21 +259,10 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
               );
 
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('🚨 ¡Alerta SOS enviada con éxito a tus contactos de emergencia!'),
-                  backgroundColor: const Color(0xFFE25C54),
-                  duration: const Duration(seconds: 5),
-                  action: SnackBarAction(
-                    label: 'Ver alerta cuidador',
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const AlertaSosCuidadorScreen(),
-                        ),
-                      );
-                    },
-                  ),
+                const SnackBar(
+                  content: Text('🚨 ¡Alerta SOS enviada con éxito a tus contactos de emergencia!'),
+                  backgroundColor: Color(0xFFE25C54),
+                  duration: Duration(seconds: 4),
                 ),
               );
             },
@@ -283,62 +273,257 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     );
   }
 
+  void _confirmarCerrarSesion() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.logout_rounded, color: Color(0xFFE25C54)),
+            SizedBox(width: 10),
+            Text(
+              'Cerrar Sesión',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2C324E)),
+            ),
+          ],
+        ),
+        content: const Text(
+          '¿Estás seguro de que deseas salir? Para volver a ingresar necesitarás tu código de vinculación.',
+          style: TextStyle(fontSize: 14.5, color: Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE25C54),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              elevation: 0,
+            ),
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              Navigator.pop(context);
+              await AuthService.cerrarSesion();
+              if (!mounted) return;
+              navigator.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+            child: const Text('Sí, salir', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _mostrarMenuOpciones() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEDE9FE),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.person_rounded, color: Color(0xFF5E5482), size: 24),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _nombrePaciente,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2C324E),
+                      ),
+                    ),
+                    const Text(
+                      'Menú del Paciente',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF6B7280),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.calendar_today_rounded, color: Color(0xFF453E60), size: 22),
+              ),
+              title: const Text(
+                'Tomas de Hoy',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF2C324E)),
+              ),
+              subtitle: const Text(
+                'Revisa los horarios y medicamentos de hoy',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF94A3B8)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => HorarioMedicamentosScreen(pacienteId: _idPaciente),
+                  ),
+                );
+                _cargarTomasHoy();
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.medication_rounded, color: Color(0xFF453E60), size: 22),
+              ),
+              title: const Text(
+                'Mis Medicamentos',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFF2C324E)),
+              ),
+              subtitle: const Text(
+                'Consulta todos tus tratamientos activos',
+                style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFF94A3B8)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => TratamientosScreen(
+                      esModoCuidador: false,
+                      pacienteId: _idPaciente,
+                    ),
+                  ),
+                );
+                _cargarTomasHoy();
+              },
+            ),
+            const SizedBox(height: 20),
+            const Divider(color: Color(0xFFE2E8F0), thickness: 1),
+            const SizedBox(height: 10),
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.logout_rounded, color: Color(0xFFE25C54), size: 22),
+              ),
+              title: const Text(
+                'Cerrar Sesión',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16, color: Color(0xFFE25C54)),
+              ),
+              subtitle: const Text(
+                'Desconectar este dispositivo',
+                style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              ),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Color(0xFFE25C54)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _confirmarCerrarSesion();
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tomasTomadas = _tomasHoy.where((t) => t.esTomada).length;
     final totalTomas = _tomasHoy.length;
     final tomaMasProxima = _obtenerTomaMasProxima();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAF7F2), // Fondo suave crema
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _cargarTomasHoy,
-          color: const Color(0xFF453E60),
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Encabezado superior: Saludo, Fecha y Botón de Calendario
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              if (Navigator.of(context).canPop()) ...[
-                                IconButton(
-                                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                                  color: const Color(0xFF2C324E),
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => Navigator.of(context).maybePop(),
-                                ),
-                                const SizedBox(width: 8),
-                              ],
-                              Flexible(
-                                child: Text(
-                                  '¡Hola, $_nombrePaciente!',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2C324E),
-                                  ),
-                                ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _confirmarCerrarSesion();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFAF7F2), // Fondo suave crema
+        body: SafeArea(
+          child: RefreshIndicator(
+            onRefresh: _cargarTomasHoy,
+            color: const Color(0xFF453E60),
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Encabezado superior: Saludo, Fecha y Botón de Menú
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '¡Hola, $_nombrePaciente!',
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2C324E),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Padding(
-                            padding: EdgeInsets.only(left: Navigator.of(context).canPop() ? 26.0 : 0.0),
-                            child: Text(
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
                               _formatearFechaHoy(),
                               style: const TextStyle(
                                 fontSize: 14.5,
@@ -346,48 +531,39 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
                                 fontWeight: FontWeight.w400,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Botón de calendario / horarios
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFEAE7E0), width: 1.2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.03),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.calendar_today_outlined,
-                          color: Color(0xFF453E60),
-                          size: 22,
+                          ],
                         ),
-                        onPressed: () async {
-                          await Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => HorarioMedicamentosScreen(
-                                pacienteId: _idPaciente,
-                              ),
-                            ),
-                          );
-                          _cargarTomasHoy();
-                        },
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
+                      const SizedBox(width: 12),
+                      // Botón de menú de 3 puntos
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEAE7E0), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.03),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          tooltip: 'Menú de opciones',
+                          icon: const Icon(
+                            Icons.more_vert_rounded,
+                            color: Color(0xFF453E60),
+                            size: 24,
+                          ),
+                          onPressed: _mostrarMenuOpciones,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
 
                 // Pregunta principal central
                 const Text(
@@ -534,60 +710,14 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // Botón para que el paciente visualice su lista de medicamentos asignados
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                  onPressed: () async {
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => TratamientosScreen(
-                          esModoCuidador: false,
-                          pacienteId: _idPaciente,
-                        ),
-                      ),
-                    );
-                    _cargarTomasHoy();
-                  },
-                  icon: const Icon(Icons.medication_liquid_rounded, color: Color(0xFF5E5482)),
-                  label: const Text(
-                    '📋 Ver mis medicamentos asignados',
-                    style: TextStyle(
-                      color: Color(0xFF5E5482),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-
-                // Botón de prueba para simular la llegada de la alarma
-                if (tomaMasProxima != null)
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    onPressed: () => _abrirAlarmaParaToma(tomaMasProxima),
-                    icon: const Icon(Icons.alarm_on_rounded, color: Color(0xFF5E5482)),
-                    label: Text(
-                      '🔔 Probar pantalla de Alarma (${tomaMasProxima.horaProgramada})',
-                      style: const TextStyle(
-                        color: Color(0xFF5E5482),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 16),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // CONSTRUCCIÓN DE LA TARJETA DE LA PASTILLA / TOMA MÁS PRÓXIMA
   Widget _buildTarjetaToma(TomaModel toma) {
@@ -804,53 +934,38 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
           ],
           const SizedBox(height: 20),
 
-          // Fila de acciones: Botón principal "Confirmar Toma" + Botón Alarma
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF7CD4C2),
-                    foregroundColor: const Color(0xFF1E3F38),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  onPressed: enProceso ? null : () => _confirmarToma(toma),
-                  icon: enProceso
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Color(0xFF1E3F38),
-                          ),
-                        )
-                      : const Icon(Icons.check_circle_outline_rounded, size: 20),
-                  label: Text(
-                    enProceso ? 'Confirmando...' : 'Confirmar Toma',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFF5A527A),
+          // Botón principal "Confirmar Toma"
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF7CD4C2),
+                foregroundColor: const Color(0xFF1E3F38),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: IconButton(
-                  tooltip: 'Abrir alarma',
-                  icon: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
-                  onPressed: () => _abrirAlarmaParaToma(toma),
+              ),
+              onPressed: enProceso ? null : () => _confirmarToma(toma),
+              icon: enProceso
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFF1E3F38),
+                      ),
+                    )
+                  : const Icon(Icons.check_circle_outline_rounded, size: 20),
+              label: Text(
+                enProceso ? 'Confirmando...' : 'Confirmar Toma',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ],
+            ),
           ),
         ],
       ),

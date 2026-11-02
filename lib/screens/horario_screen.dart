@@ -22,7 +22,6 @@ class _HorarioMedicamentosScreenState extends State<HorarioMedicamentosScreen>
   bool _cargando = true;
   String? _idPacienteActual;
   final Set<int> _tomasEnProceso = {};
-  int _diaSeleccionado = 1; // 1 = Hoy
 
   @override
   void initState() {
@@ -118,24 +117,6 @@ class _HorarioMedicamentosScreenState extends State<HorarioMedicamentosScreen>
     return '$diaSemana, ${ahora.day} de $mes';
   }
 
-  List<String> _generarDiasSemana() {
-    final ahora = DateTime.now();
-    const nombresDias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
-
-    final ayer = ahora.subtract(const Duration(days: 1));
-    final manana = ahora.add(const Duration(days: 1));
-    final masDos = ahora.add(const Duration(days: 2));
-    final masTres = ahora.add(const Duration(days: 3));
-
-    return [
-      'Ayer\n${nombresDias[ayer.weekday]} ${ayer.day}',
-      'HOY\n${nombresDias[ahora.weekday]} ${ahora.day}',
-      'Mañana\n${nombresDias[manana.weekday]} ${manana.day}',
-      '${nombresDias[masDos.weekday]} ${masDos.day}',
-      '${nombresDias[masTres.weekday]} ${masTres.day}',
-    ];
-  }
-
   String _obtenerMomentoDelDia(String horaStr) {
     try {
       final match = RegExp(r'(\d+):(\d+)\s*(AM|PM)?', caseSensitive: false).firstMatch(horaStr.trim());
@@ -165,7 +146,6 @@ class _HorarioMedicamentosScreenState extends State<HorarioMedicamentosScreen>
   Widget build(BuildContext context) {
     final int totalTomas = _tomas.length;
     final int tomasCompletadas = _tomas.where((m) => m.esTomada).length;
-    final diasSemana = _generarDiasSemana();
     final proximaPendiente = _obtenerProximaPendiente();
 
     return Scaffold(
@@ -261,63 +241,6 @@ class _HorarioMedicamentosScreenState extends State<HorarioMedicamentosScreen>
                           fontSize: 16,
                           color: Color(0xFF6B7280),
                           fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Selector de días dinámico
-                      SizedBox(
-                        height: 65,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: diasSemana.length,
-                          itemBuilder: (context, index) {
-                            bool esSeleccionado = index == _diaSeleccionado;
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 10.0),
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () {
-                                  setState(() {
-                                    _diaSeleccionado = index;
-                                  });
-                                  if (index == 1) {
-                                    _cargarTomas();
-                                  }
-                                },
-                                child: Container(
-                                  width: 85,
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: esSeleccionado
-                                        ? const Color(0xFF5E5482)
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: esSeleccionado
-                                          ? const Color(0xFF5E5482)
-                                          : const Color(0xFFE2E0D8),
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      diasSemana[index],
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.bold,
-                                        color: esSeleccionado
-                                            ? Colors.white
-                                            : const Color(0xFF475569),
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
                         ),
                       ),
                       const SizedBox(height: 20),

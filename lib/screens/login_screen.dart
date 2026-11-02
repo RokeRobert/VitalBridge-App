@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
@@ -17,7 +18,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _tokenController = TextEditingController(text: 'VB-8492');
+  final TextEditingController _tokenController = TextEditingController();
   bool _obscurePassword = true;
   bool _cargandoCuidador = false;
 
@@ -32,10 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final savedEmail = prefs.getString('usuario_correo');
     if (savedEmail != null && savedEmail.isNotEmpty) {
       _emailController.text = savedEmail;
-    } else {
-      _emailController.text = 'maria.cuidadora@vitalbridge.com';
     }
-    _passwordController.text = 'VitalBridge2026!';
   }
 
   @override
@@ -200,6 +198,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _tokenController,
                   textAlign: TextAlign.center,
+                  inputFormatters: [
+                    TokenInputFormatter(),
+                    LengthLimitingTextInputFormatter(14),
+                  ],
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -725,6 +727,39 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class TokenInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.length < oldValue.text.length) {
+      return newValue;
+    }
+
+    String text = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    if (text.length > 10) {
+      text = text.substring(0, 10);
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 1 && text.length > 2) {
+        buffer.write('-');
+      } else if (i == 5 && text.length > 6) {
+        buffer.write('-');
+      }
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
     );
   }
 }

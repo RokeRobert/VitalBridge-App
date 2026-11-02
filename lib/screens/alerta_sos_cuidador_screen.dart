@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -58,7 +58,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
 
       _vibracionTimer = Timer.periodic(const Duration(milliseconds: 900), (_) {
         if (_sirenaActiva) {
-          HapticFeedback.heavyImpact();
+          HapticFeedback.vibrate();
         }
       });
     } catch (_) {}

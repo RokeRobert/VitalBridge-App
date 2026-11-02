@@ -242,7 +242,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               Navigator.pop(context); // Cierra pantalla de alerta SOS y regresa al dashboard
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('✅ Alerta SOS marcada como atendida exitosamente.'),
+                  content: Text('Alerta SOS marcada como atendida exitosamente.'),
                   backgroundColor: Color(0xFF2C5E53),
                   duration: Duration(seconds: 3),
                 ),
@@ -286,7 +286,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('🚨 Conectando con Servicios de Emergencia 911...'),
+                  content: Text('Conectando con Servicios de Emergencia 911...'),
                   backgroundColor: Color(0xFFE25C54),
                   duration: Duration(seconds: 3),
                 ),
@@ -403,7 +403,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                     ],
                   ),
                   child: const Center(
-                    child: Text('🚨', style: TextStyle(fontSize: 26)),
+                    child: Icon(Icons.warning_amber_rounded, color: Color(0xFFE25C54), size: 30),
                   ),
                 ),
               ),
@@ -580,7 +580,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Center(
-                            child: Text('🚨', style: TextStyle(fontSize: 18)),
+                            child: Icon(Icons.warning_amber_rounded, color: Color(0xFFE25C54), size: 20),
                           ),
                         ),
                       ],

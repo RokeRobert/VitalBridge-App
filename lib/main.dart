@@ -1,16 +1,29 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
+import 'package:vital_bridge/services/fcm_service.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
 import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Inicializar Firebase y oyente de mensajes en segundo plano
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
   await SupabaseService.inicializar();
   await AlarmasNativasService.inicializar();
+  await FcmService.inicializar();
 
   // Comprobar persistencia de sesión previa
   final prefs = await SharedPreferences.getInstance();
@@ -48,6 +61,7 @@ void main() async {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (payloadAlarma == null) {
       AlarmasNativasService.verificarLanzamientoDesdeNotificacion();
+      FcmService.verificarLanzamientoSos();
     }
   });
 }

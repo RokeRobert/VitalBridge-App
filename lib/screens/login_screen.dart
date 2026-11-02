@@ -5,6 +5,7 @@ import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/screens/registro_screen.dart';
 import 'package:vital_bridge/services/auth_service.dart';
+import 'package:vital_bridge/services/fcm_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 import 'package:vital_bridge/screens/escaner_qr_screen.dart';
 
@@ -81,6 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
+        FcmService.sincronizarTokenCuidador();
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
         );

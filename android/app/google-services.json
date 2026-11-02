@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "663527031344",
+    "project_id": "vitalbridge-84ca6",
+    "storage_bucket": "vitalbridge-84ca6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:663527031344:android:04f365bca5f59b3a39e3f5",
+        "android_client_info": {
+          "package_name": "com.example.vital_bridge"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzejN474CD22fi6lKVgLaXRBH1TitIdZo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

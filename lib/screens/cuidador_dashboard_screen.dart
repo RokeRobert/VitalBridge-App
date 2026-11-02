@@ -15,6 +15,7 @@ import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
+import 'package:vital_bridge/services/fcm_service.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
@@ -49,6 +50,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
     super.initState();
     _cargarPacientes();
     _iniciarRealtime();
+    FcmService.sincronizarTokenCuidador();
   }
 
   @override
@@ -122,7 +124,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> {
               SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '🚨 ¡EMERGENCIA SOS!',
+                  '¡EMERGENCIA SOS!',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,

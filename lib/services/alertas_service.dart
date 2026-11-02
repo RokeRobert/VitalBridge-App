@@ -166,6 +166,30 @@ class AlertasService {
     return true;
   }
 
+  /// Registra el token FCM del cuidador en el backend
+  static Future<bool> registrarTokenFcm(String token) async {
+    try {
+      final headers = await _obtenerHeaders();
+      final prefs = await SharedPreferences.getInstance();
+      final usuarioId = prefs.getString('auth_user_id');
+
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.registrarFcmToken),
+            headers: headers,
+            body: jsonEncode({
+              'token': token,
+              if (usuarioId != null && usuarioId.isNotEmpty) 'idUsuario': usuarioId,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void _marcarAlertaResuelta(int idAlerta, String resolucion) {
     final index = _alertasSimuladas.indexWhere((a) => a.id == idAlerta);
     if (index != -1) {

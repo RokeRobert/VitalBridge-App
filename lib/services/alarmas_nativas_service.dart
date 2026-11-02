@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -295,5 +296,45 @@ class AlarmasNativasService {
         await programarAlarmaParaToma(toma);
       }
     }
+  }
+
+  // --- MÉTODOS DE COMPROBACIÓN Y ACCESO A PERMISOS NATIVOS ---
+  static const MethodChannel _channelPermisos =
+      MethodChannel('vital_bridge/permisos_sistema');
+
+  static Future<bool> tienePermisoAlarmasExactas() async {
+    try {
+      final res = await _channelPermisos.invokeMethod<bool>('verificarPermisoAlarmasExactas');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> abrirAjustesAlarmasExactas() async {
+    try {
+      await _channelPermisos.invokeMethod('abrirAjustesAlarmasExactas');
+    } catch (_) {}
+  }
+
+  static Future<bool> tienePermisoAparecerEncima() async {
+    try {
+      final res = await _channelPermisos.invokeMethod<bool>('verificarPermisoAparecerEncima');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> abrirAjustesAparecerEncima() async {
+    try {
+      await _channelPermisos.invokeMethod('abrirAjustesAparecerEncima');
+    } catch (_) {}
+  }
+
+  static Future<void> abrirAjustesApp() async {
+    try {
+      await _channelPermisos.invokeMethod('abrirAjustesApp');
+    } catch (_) {}
   }
 }

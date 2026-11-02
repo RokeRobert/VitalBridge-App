@@ -25,6 +25,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   String _nombrePaciente = 'Paciente';
   String? _idPaciente;
   final Set<int> _tomasEnProceso = {};
+  bool _faltanPermisosAlarma = false;
 
   // Canales en tiempo real de Supabase
   RealtimeChannel? _canalTratamientos;
@@ -84,6 +85,30 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _cargarTomasHoy();
+      _verificarPermisosSistema();
+    }
+  }
+
+  Future<void> _verificarPermisosSistema() async {
+    final tieneAparecerEncima = await AlarmasNativasService.tienePermisoAparecerEncima();
+    final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
+    if (mounted) {
+      setState(() {
+        _faltanPermisosAlarma = !tieneAparecerEncima || !tieneAlarmasExactas;
+      });
+    }
+  }
+
+  Future<void> _solicitarPermisosAlarma() async {
+    final tieneAparecerEncima = await AlarmasNativasService.tienePermisoAparecerEncima();
+    if (!tieneAparecerEncima) {
+      await AlarmasNativasService.abrirAjustesAparecerEncima();
+      return;
+    }
+    final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
+    if (!tieneAlarmasExactas) {
+      await AlarmasNativasService.abrirAjustesAlarmasExactas();
+      return;
     }
   }
 
@@ -126,6 +151,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     }
 
     await _cargarTomasHoy();
+    await _verificarPermisosSistema();
   }
 
   Future<void> _cargarTomasHoy() async {
@@ -509,6 +535,87 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     );
   }
 
+  Widget _buildBannerPermisos() {
+    if (!_faltanPermisosAlarma) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 14, bottom: 4),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFF615586).withValues(alpha: 0.25),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF615586).withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.notifications_active_outlined,
+                color: Color(0xFF615586),
+                size: 22,
+              ),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Aviso de recordatorios',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2C324E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Para que la alarma encienda la pantalla y suene puntualmente a la hora de tu medicamento, activa el permiso del sistema en tu teléfono.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF555B6E),
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF615586),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              onPressed: _solicitarPermisosAlarma,
+              child: const Text(
+                'Activar permiso ahora',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tomasTomadas = _tomasHoy.where((t) => t.esTomada).length;
@@ -633,7 +740,8 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
                       ),
                     ),
                   ),
-                const SizedBox(height: 22),
+                _buildBannerPermisos(),
+                const SizedBox(height: 18),
 
                 // TARJETA ÚNICA: LA ALARMA / TOMA MÁS PRÓXIMA A LA HORA ACTUAL
                 if (_cargando)

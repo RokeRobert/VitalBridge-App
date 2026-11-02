@@ -277,6 +277,14 @@ class AlarmasNativasService {
     } catch (_) {}
   }
 
+  /// Cancela todas las notificaciones activas para silenciar de inmediato el sonido del sistema
+  static Future<void> cancelarTodasLasNotificacionesActivas() async {
+    try {
+      await _notifications.cancelAll();
+      debugPrint('AlarmasNativas: Todas las notificaciones activas canceladas');
+    } catch (_) {}
+  }
+
   /// Sincroniza todas las tomas del día: programa las pendientes y cancela las tomadas
   static Future<void> sincronizarAlarmasDelDia(List<TomaModel> tomas) async {
     debugPrint('AlarmasNativas: Sincronizando ${tomas.length} tomas del día...');

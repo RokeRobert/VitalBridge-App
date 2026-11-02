@@ -381,33 +381,6 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                     tooltip: 'Silenciar sirena',
                     onPressed: _silenciarSirena,
                   ),
-                  // Botón provisional de regreso a la izquierda
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        size: 16,
-                        color: AppColors.azulOscuro,
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ),
-
-                  
                 ],
               ),
               const SizedBox(height: 18),

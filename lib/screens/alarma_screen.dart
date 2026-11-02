@@ -3,6 +3,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
 class AlarmaMedicamentoScreen extends StatefulWidget {
@@ -53,9 +54,11 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
       await _audioPlayer.setVolume(1.0);
       await _audioPlayer.play(AssetSource('sounds/alarma.wav'));
 
-      _vibracionTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      // Vibración pulsante constante mientras la alarma esté activa
+      HapticFeedback.heavyImpact();
+      _vibracionTimer = Timer.periodic(const Duration(milliseconds: 600), (_) {
         if (_alarmaSonando) {
-          HapticFeedback.vibrate();
+          HapticFeedback.heavyImpact();
         }
       });
     } catch (_) {}
@@ -67,6 +70,11 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
     try {
       _audioPlayer.stop();
     } catch (_) {}
+    // Cancelar la notificación del sistema Android para apagar de inmediato su sonido
+    if (widget.idHorario != null) {
+      AlarmasNativasService.cancelarAlarma(widget.idHorario!);
+    }
+    AlarmasNativasService.cancelarTodasLasNotificacionesActivas();
   }
 
   void _silenciarAlarma() {
@@ -119,11 +127,6 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
   }
 
   void _cerrarAplicacion() {
-    _detenerAlarmaSonido();
-    SystemNavigator.pop();
-  }
-
-  void _volverModoPrueba() {
     _detenerAlarmaSonido();
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop(_tomaConfirmada);
@@ -384,23 +387,6 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Enlace para modo de pruebas / diseño (no cierra la app, solo regresa)
-                Center(
-                  child: TextButton.icon(
-                    onPressed: _volverModoPrueba,
-                    icon: const Icon(Icons.arrow_back_rounded, size: 18, color: Color(0xFF6B7280)),
-                    label: const Text(
-                      'Volver a la app (Modo de diseño y pruebas)',
-                      style: TextStyle(
-                        color: Color(0xFF6B7280),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ),
                 ),

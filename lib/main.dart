@@ -4,10 +4,12 @@ import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/services/supabase_service.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SupabaseService.inicializar();
+  await AlarmasNativasService.inicializar();
 
   // Comprobar persistencia de sesión previa
   final prefs = await SharedPreferences.getInstance();
@@ -28,6 +30,11 @@ void main() async {
   }
 
   runApp(VitalBridgeApp(pantallaInicial: pantallaInicial));
+
+  // Verificar si la app fue abierta directamente al sonar una alarma mientras estaba cerrada
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    AlarmasNativasService.verificarLanzamientoDesdeNotificacion();
+  });
 }
 
 class VitalBridgeApp extends StatelessWidget {
@@ -37,6 +44,7 @@ class VitalBridgeApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: AlarmasNativasService.navigatorKey,
       debugShowCheckedModeBanner: false,
       title: 'VitalBridge',
       theme: ThemeData(

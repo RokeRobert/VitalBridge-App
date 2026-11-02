@@ -7,6 +7,7 @@ import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/tratamientos_screen.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/auth_service.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
 import 'package:vital_bridge/services/supabase_service.dart';
@@ -137,6 +138,9 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
       _tomasHoy = tomas;
       _cargando = false;
     });
+
+    // Programar / actualizar alarmas exactas nativas en Android para las tomas de hoy
+    AlarmasNativasService.sincronizarAlarmasDelDia(tomas);
   }
 
   DateTime _parsearHora(String horaStr, DateTime base) {
@@ -194,6 +198,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     setState(() {
       _tomasEnProceso.remove(toma.idHorario);
       if (exito) {
+        AlarmasNativasService.cancelarAlarma(toma.idHorario);
         final index = _tomasHoy.indexWhere((t) => t.idHorario == toma.idHorario);
         if (index != -1) {
           _tomasHoy[index] = _tomasHoy[index].copyWith(

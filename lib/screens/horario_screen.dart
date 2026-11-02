@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/services/auth_service.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
 class HorarioMedicamentosScreen extends StatefulWidget {
@@ -81,6 +82,7 @@ class _HorarioMedicamentosScreenState extends State<HorarioMedicamentosScreen>
     setState(() {
       _tomasEnProceso.remove(med.idHorario);
       if (exito) {
+        AlarmasNativasService.cancelarAlarma(med.idHorario);
         final index = _tomas.indexWhere((t) => t.idHorario == med.idHorario);
         if (index != -1) {
           _tomas[index] = _tomas[index].copyWith(

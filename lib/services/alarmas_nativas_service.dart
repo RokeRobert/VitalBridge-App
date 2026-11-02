@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
 
 /// Servicio centralizado de Alarmas Nativas para el Paciente.
-/// Utiliza Android AlarmManager / Exact Alarms para despertar el dispositivo
+/// Utiliza Android AlarmManager (AlarmClock) para despertar el dispositivo
 /// a la hora exacta de la toma, incluso si la app está completamente cerrada.
 class AlarmasNativasService {
   static final FlutterLocalNotificationsPlugin _notifications =
@@ -18,15 +19,33 @@ class AlarmasNativasService {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
-  static const String _channelId = 'canal_alarmas_medicamentos';
+  static const String _channelId = 'vitalbridge_alarmas_medicas_v4';
   static const String _channelName = 'Alarmas de Medicamentos';
   static const String _channelDesc =
       'Alarmas críticas de tomas de medicamentos que despiertan el teléfono';
 
-  /// Inicializa el motor de notificaciones y la base de datos de zonas horarias
+  /// Inicializa el motor de notificaciones y detecta la zona horaria real del teléfono
   static Future<void> inicializar() async {
-    // 1. Inicializar Timezones
+    // 1. Inicializar Timezones con la zona horaria REAL del dispositivo
     tz.initializeTimeZones();
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      final String timeZoneName = tzInfo.identifier;
+      tz.setLocalLocation(tz.getLocation(timeZoneName));
+      debugPrint('AlarmasNativas: Zona horaria detectada: $timeZoneName');
+    } catch (e) {
+      debugPrint('AlarmasNativas: Error detectando zona horaria: $e. Usando offset local.');
+      try {
+        final offset = DateTime.now().timeZoneOffset;
+        for (final loc in tz.timeZoneDatabase.locations.values) {
+          if (loc.currentTimeZone.offset == offset) {
+            tz.setLocalLocation(loc);
+            debugPrint('AlarmasNativas: Zona asignada por offset: ${loc.name}');
+            break;
+          }
+        }
+      } catch (_) {}
+    }
 
     // 2. Configuración nativa de Android
     const AndroidInitializationSettings androidSettings =
@@ -82,15 +101,27 @@ class AlarmasNativasService {
     } catch (_) {}
   }
 
+  /// Retorna el payload de notificación si la app fue abierta por una alarma
+  static Future<Map<String, dynamic>?> obtenerPayloadLanzamiento() async {
+    try {
+      final details = await _notifications.getNotificationAppLaunchDetails();
+      if (details != null &&
+          details.didNotificationLaunchApp &&
+          details.notificationResponse?.payload != null) {
+        final payload = details.notificationResponse!.payload!;
+        if (payload.isNotEmpty) {
+          return jsonDecode(payload) as Map<String, dynamic>;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Verifica si la aplicación fue abierta por una alarma nativa mientras estaba cerrada
   static Future<void> verificarLanzamientoDesdeNotificacion() async {
-    final details = await _notifications.getNotificationAppLaunchDetails();
-    if (details != null &&
-        details.didNotificationLaunchApp &&
-        details.notificationResponse?.payload != null) {
-      final payload = details.notificationResponse!.payload!;
-      try {
-        final Map<String, dynamic> datos = jsonDecode(payload);
+    try {
+      final datos = await obtenerPayloadLanzamiento();
+      if (datos != null) {
         _abrirPantallaAlarma(
           idHorario: datos['idHorario'] as int?,
           nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',
@@ -98,7 +129,9 @@ class AlarmasNativasService {
           hora: datos['hora'] as String? ?? '',
           indicaciones: datos['indicaciones'] as String? ?? '',
         );
-      } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('AlarmasNativas: Error al verificar lanzamiento: $e');
     }
   }
 
@@ -123,10 +156,10 @@ class AlarmasNativasService {
     );
   }
 
-  /// Parsea la hora en formato '08:00 AM', '14:30', etc. y retorna la hora y minuto
+  /// Parsea la hora en formato '08:00 AM', '14:30', '08:00:00', etc.
   static TimeOfDay? parsearHora(String horaStr) {
     try {
-      final match = RegExp(r'(\d+):(\d+)\s*(AM|PM)?', caseSensitive: false)
+      final match = RegExp(r'(\d+):(\d+)(?::\d+)?\s*(AM|PM)?', caseSensitive: false)
           .firstMatch(horaStr.trim());
       if (match != null) {
         int hora = int.parse(match.group(1)!);
@@ -150,7 +183,10 @@ class AlarmasNativasService {
     }
 
     final horaMinuto = parsearHora(toma.horaProgramada);
-    if (horaMinuto == null) return;
+    if (horaMinuto == null) {
+      debugPrint('AlarmasNativas: No se pudo parsear hora: ${toma.horaProgramada}');
+      return;
+    }
 
     final ahora = tz.TZDateTime.now(tz.local);
     var fechaAlarma = tz.TZDateTime(
@@ -160,11 +196,22 @@ class AlarmasNativasService {
       ahora.day,
       horaMinuto.hour,
       horaMinuto.minute,
+      0,
     );
 
-    // Si la hora ya pasó hoy (por más de 1 minuto), no la programamos en el pasado
-    if (fechaAlarma.isBefore(ahora.subtract(const Duration(minutes: 1)))) {
+    // Si la hora ya pasó hoy por más de 15 minutos, no la programamos en el pasado lejano
+    if (fechaAlarma.isBefore(ahora.subtract(const Duration(minutes: 15)))) {
+      debugPrint('AlarmasNativas: Toma ${toma.medicamento} a las ${toma.horaProgramada} ya expiró hoy.');
       return;
+    }
+
+    // Si la hora coincide con el minuto actual o pasó hace unos instantes (ej. prueba del usuario),
+    // la programamos 5 segundos hacia el futuro para que suene de inmediato sin crashear el AlarmManager
+    if (!fechaAlarma.isAfter(ahora)) {
+      fechaAlarma = ahora.add(const Duration(seconds: 5));
+      debugPrint('AlarmasNativas: Toma en curso/inmediata. Programada en 5 segundos: $fechaAlarma');
+    } else {
+      debugPrint('AlarmasNativas: Toma futura programada a las: $fechaAlarma (Ahora: $ahora)');
     }
 
     final androidDetails = AndroidNotificationDetails(
@@ -192,17 +239,20 @@ class AlarmasNativasService {
     });
 
     try {
+      // AndroidScheduleMode.alarmClock es el modo más potente de Android:
+      // Se registra como reloj de alarma del sistema y despierta el teléfono incluso en modo Doze
       await _notifications.zonedSchedule(
         id: toma.idHorario,
         title: '⏰ ¡Hora de tu medicamento!',
         body: 'Es momento de tomar ${toma.medicamento} (${toma.dosis}).',
         scheduledDate: fechaAlarma,
         notificationDetails: NotificationDetails(android: androidDetails),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        androidScheduleMode: AndroidScheduleMode.alarmClock,
         payload: payload,
       );
-    } catch (_) {
-      // Respaldo con modo inexacto si el dispositivo restringe alarmas exactas
+      debugPrint('AlarmasNativas: ✅ Alarma registrada exitosamente para id ${toma.idHorario}');
+    } catch (e) {
+      debugPrint('AlarmasNativas: Aviso: Falló exactAlarmClock, intentando exactAllowWhileIdle: $e');
       try {
         await _notifications.zonedSchedule(
           id: toma.idHorario,
@@ -210,10 +260,12 @@ class AlarmasNativasService {
           body: 'Es momento de tomar ${toma.medicamento} (${toma.dosis}).',
           scheduledDate: fechaAlarma,
           notificationDetails: NotificationDetails(android: androidDetails),
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
           payload: payload,
         );
-      } catch (_) {}
+      } catch (e2) {
+        debugPrint('AlarmasNativas: Error definitivo al programar alarma: $e2');
+      }
     }
   }
 
@@ -221,11 +273,13 @@ class AlarmasNativasService {
   static Future<void> cancelarAlarma(int idHorario) async {
     try {
       await _notifications.cancel(id: idHorario);
+      debugPrint('AlarmasNativas: Alarma cancelada para id $idHorario');
     } catch (_) {}
   }
 
   /// Sincroniza todas las tomas del día: programa las pendientes y cancela las tomadas
   static Future<void> sincronizarAlarmasDelDia(List<TomaModel> tomas) async {
+    debugPrint('AlarmasNativas: Sincronizando ${tomas.length} tomas del día...');
     for (final toma in tomas) {
       if (toma.esTomada) {
         await cancelarAlarma(toma.idHorario);

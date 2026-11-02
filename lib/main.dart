@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:vital_bridge/screens/alarma_screen.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/paciente_screen.dart';
@@ -16,8 +17,19 @@ void main() async {
   final token = prefs.getString('auth_token');
   final rol = prefs.getString('auth_rol');
 
+  // Comprobar si la app fue lanzada al despertar por una alarma
+  final payloadAlarma = await AlarmasNativasService.obtenerPayloadLanzamiento();
+
   Widget pantallaInicial;
-  if (token != null && token.isNotEmpty) {
+  if (payloadAlarma != null) {
+    pantallaInicial = AlarmaMedicamentoScreen(
+      idHorario: payloadAlarma['idHorario'] as int?,
+      nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',
+      dosis: payloadAlarma['dosis'] as String? ?? '',
+      hora: payloadAlarma['hora'] as String? ?? '',
+      indicaciones: payloadAlarma['indicaciones'] as String? ?? '',
+    );
+  } else if (token != null && token.isNotEmpty) {
     if (rol == 'cuidador') {
       pantallaInicial = const CuidadorDashboardScreen();
     } else if (rol == 'paciente') {
@@ -31,7 +43,7 @@ void main() async {
 
   runApp(VitalBridgeApp(pantallaInicial: pantallaInicial));
 
-  // Verificar si la app fue abierta directamente al sonar una alarma mientras estaba cerrada
+  // Respaldo por si la navegación requirió el Navigator montado
   WidgetsBinding.instance.addPostFrameCallback((_) {
     AlarmasNativasService.verificarLanzamientoDesdeNotificacion();
   });

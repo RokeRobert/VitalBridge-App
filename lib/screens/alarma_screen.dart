@@ -1,7 +1,8 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:vital_bridge/screens/paciente_screen.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
 class AlarmaMedicamentoScreen extends StatefulWidget {
@@ -124,7 +125,13 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
 
   void _volverModoPrueba() {
     _detenerAlarmaSonido();
-    Navigator.of(context).maybePop(_tomaConfirmada);
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(_tomaConfirmada);
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const PacienteScreen()),
+      );
+    }
   }
 
   @override

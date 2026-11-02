@@ -96,6 +96,7 @@ class AlarmasNativasService {
 
     try {
       final Map<String, dynamic> datos = jsonDecode(payload);
+      cancelarTodasLasNotificacionesActivas();
       if (datos['tipo'] == 'SOS') {
         FcmService.abrirPantallaAlertaSos(datos);
         return;
@@ -240,6 +241,8 @@ class AlarmasNativasService {
       importance: Importance.max,
       priority: Priority.max,
       fullScreenIntent: true,
+      autoCancel: true,
+      ongoing: false,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
       sound: const RawResourceAndroidNotificationSound('alarma'),
@@ -302,6 +305,17 @@ class AlarmasNativasService {
       await _notifications.cancelAll();
       debugPrint('AlarmasNativas: Todas las notificaciones activas canceladas');
     } catch (_) {}
+    try {
+      await _channelPermisos.invokeMethod('cancelarTodasLasNotificaciones');
+    } catch (_) {}
+  }
+
+  /// Cancela específicamente la notificación de alerta SOS de alta prioridad (id 9999)
+  static Future<void> cancelarNotificacionSos() async {
+    try {
+      await _notifications.cancel(id: 9999);
+    } catch (_) {}
+    await cancelarTodasLasNotificacionesActivas();
   }
 
   /// Sincroniza todas las tomas del día: programa las pendientes y cancela las tomadas

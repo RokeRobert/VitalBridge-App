@@ -48,6 +48,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       importance: Importance.max,
       priority: Priority.max,
       fullScreenIntent: true,
+      autoCancel: true,
+      ongoing: false,
       category: AndroidNotificationCategory.alarm,
       audioAttributesUsage: AudioAttributesUsage.alarm,
       sound: const RawResourceAndroidNotificationSound('alarma'),
@@ -151,6 +153,7 @@ class FcmService {
     if (context == null) return;
 
     alertaSosAbierta = true;
+    AlarmasNativasService.cancelarNotificacionSos();
 
     final idAlerta = int.tryParse(data['idAlerta']?.toString() ?? '0');
     final latitud = double.tryParse(data['latitud']?.toString() ?? '');

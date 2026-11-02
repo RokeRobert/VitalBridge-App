@@ -43,6 +43,7 @@ void main() async {
       final nombrePaciente = payloadAlarma['nombrePaciente']?.toString() ?? 'Paciente';
 
       FcmService.alertaSosAbierta = true;
+      AlarmasNativasService.cancelarNotificacionSos();
       pantallaInicial = AlertaSosCuidadorScreen(
         nombrePaciente: nombrePaciente,
         idAlerta: idAlerta,
@@ -52,6 +53,7 @@ void main() async {
       );
     } else {
       AlarmasNativasService.alarmaAbierta = true;
+      AlarmasNativasService.cancelarTodasLasNotificacionesActivas();
       pantallaInicial = AlarmaMedicamentoScreen(
         idHorario: payloadAlarma['idHorario'] as int?,
         nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',

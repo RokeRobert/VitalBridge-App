@@ -37,6 +37,11 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
   @override
   void initState() {
     super.initState();
+    AlarmasNativasService.alarmaAbierta = true;
+    if (widget.idHorario != null) {
+      AlarmasNativasService.cancelarAlarma(widget.idHorario!);
+    }
+    AlarmasNativasService.cancelarTodasLasNotificacionesActivas();
     _audioPlayer = AudioPlayer();
     _iniciarAlarmaSonido();
   }
@@ -127,24 +132,34 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
     );
   }
 
-  void _cerrarAplicacion() {
+  Future<void> _cerrarAplicacion() async {
     AlarmasNativasService.alarmaAbierta = false;
     _detenerAlarmaSonido();
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop(_tomaConfirmada);
+    final navigator = Navigator.of(context);
+    final puedeHacerPop = navigator.canPop();
+
+    await AlarmasNativasService.cancelarTodasLasNotificacionesActivas();
+    final estabaBloqueado = await AlarmasNativasService.estaPantallaBloqueada();
+
+    if (!estabaBloqueado && puedeHacerPop) {
+      if (!mounted) return;
+      navigator.pop(_tomaConfirmada);
     } else {
-      Navigator.of(context).pushReplacement(
+      if (!mounted) return;
+      navigator.pushReplacement(
         MaterialPageRoute(builder: (_) => const PacienteScreen()),
       );
+      await AlarmasNativasService.cerrarPantallaAlarma();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: true,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        // Asegura que si se usa el botón atrás nativo, se informe si fue confirmada
+        if (didPop) return;
+        _cerrarAplicacion();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F2),

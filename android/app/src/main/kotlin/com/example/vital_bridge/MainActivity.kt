@@ -152,7 +152,20 @@ class MainActivity : FlutterActivity() {
                     val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
                     result.success(keyguardManager?.isKeyguardLocked ?: false)
                 }
+                "cancelarTodasLasNotificaciones" -> {
+                    try {
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                        notificationManager?.cancel(9999)
+                        notificationManager?.cancelAll()
+                    } catch (_: Exception) {}
+                    result.success(true)
+                }
                 "cerrarPantallaAlarma" -> {
+                    try {
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                        notificationManager?.cancel(9999)
+                        notificationManager?.cancelAll()
+                    } catch (_: Exception) {}
                     restablecerPantallaBloqueo()
                     finish()
                     result.success(true)

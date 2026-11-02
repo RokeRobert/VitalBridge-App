@@ -43,6 +43,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
   void initState() {
     super.initState();
     FcmService.alertaSosAbierta = true;
+    AlarmasNativasService.cancelarNotificacionSos();
     _audioPlayer = AudioPlayer();
     _iniciarSirena();
   }
@@ -51,6 +52,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
   void dispose() {
     FcmService.alertaSosAbierta = false;
     _detenerSirena();
+    AlarmasNativasService.cancelarNotificacionSos();
     _audioPlayer.dispose();
     super.dispose();
   }
@@ -80,6 +82,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
 
   void _silenciarSirena() {
     _detenerSirena();
+    AlarmasNativasService.cancelarNotificacionSos();
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -90,16 +93,17 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
   }
 
   Future<void> _salirDeAlerta({bool resolver = false}) async {
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final puedeHacerPop = navigator.canPop();
+
     _detenerSirena();
     FcmService.alertaSosAbierta = false;
+    await AlarmasNativasService.cancelarNotificacionSos();
 
     if (resolver && widget.idAlerta != null) {
       AlertasService.resolverAlerta(widget.idAlerta!, resolucion: 'Atendida');
     }
-
-    final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final puedeHacerPop = navigator.canPop();
 
     final estabaBloqueado = await AlarmasNativasService.estaPantallaBloqueada();
 

@@ -42,6 +42,7 @@ void main() async {
       final longitud = double.tryParse(payloadAlarma['longitud']?.toString() ?? '');
       final nombrePaciente = payloadAlarma['nombrePaciente']?.toString() ?? 'Paciente';
 
+      FcmService.alertaSosAbierta = true;
       pantallaInicial = AlertaSosCuidadorScreen(
         nombrePaciente: nombrePaciente,
         idAlerta: idAlerta,

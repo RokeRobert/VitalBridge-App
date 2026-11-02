@@ -40,6 +40,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
   List<TomaModel> _tomasHoy = [];
   bool _cargandoTomas = false;
   bool _faltanPermisosAlarma = false;
+  DateTime? _ultimoAtrasPresionado;
 
   // Canales de suscripción en tiempo real
   RealtimeChannel? _canalTomas;
@@ -1533,35 +1534,54 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
           : _construirVistaMonitoreoActivo();
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.fondo,
-      body: cuerpo,
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tabSeleccionado,
-        onTap: (index) {
-          setState(() => _tabSeleccionado = index);
-          if (index == 0) {
-            _cargarTomasHoy();
-          }
-        },
-        selectedItemColor: AppColors.moradoOscuro,
-        unselectedItemColor: Colors.grey[500],
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_rounded),
-            label: 'Monitoreo',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.medication_rounded),
-            label: 'Tratamientos',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_rounded),
-            label: 'Perfil',
-          ),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        final ahora = DateTime.now();
+        if (_ultimoAtrasPresionado == null ||
+            ahora.difference(_ultimoAtrasPresionado!) > const Duration(seconds: 2)) {
+          _ultimoAtrasPresionado = ahora;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Presiona atras de nuevo para salir de la aplicacion.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.fondo,
+        body: cuerpo,
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _tabSeleccionado,
+          onTap: (index) {
+            setState(() => _tabSeleccionado = index);
+            if (index == 0) {
+              _cargarTomasHoy();
+            }
+          },
+          selectedItemColor: AppColors.moradoOscuro,
+          unselectedItemColor: Colors.grey[500],
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.dashboard_rounded),
+              label: 'Monitoreo',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.medication_rounded),
+              label: 'Tratamientos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              label: 'Perfil',
+            ),
+          ],
+        ),
       ),
     );
   }

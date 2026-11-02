@@ -51,6 +51,21 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun restablecerPantallaBloqueo() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(false)
+            setTurnScreenOn(false)
+        }
+        @Suppress("DEPRECATION")
+        window.clearFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON or
+            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
@@ -131,6 +146,15 @@ class MainActivity : FlutterActivity() {
                 }
                 "abrirAjustesApp" -> {
                     abrirAjustesApp()
+                    result.success(true)
+                }
+                "estaPantallaBloqueada" -> {
+                    val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+                    result.success(keyguardManager?.isKeyguardLocked ?: false)
+                }
+                "cerrarPantallaAlarma" -> {
+                    restablecerPantallaBloqueo()
+                    finish()
                     result.success(true)
                 }
                 else -> result.notImplemented()

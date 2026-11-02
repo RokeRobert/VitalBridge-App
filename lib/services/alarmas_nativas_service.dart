@@ -370,4 +370,21 @@ class AlarmasNativasService {
       await _channelPermisos.invokeMethod('abrirAjustesApp');
     } catch (_) {}
   }
+
+  static Future<bool> estaPantallaBloqueada() async {
+    try {
+      final res = await _channelPermisos.invokeMethod<bool>('estaPantallaBloqueada');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> cerrarPantallaAlarma() async {
+    try {
+      await _channelPermisos.invokeMethod('cerrarPantallaAlarma');
+    } catch (_) {
+      SystemNavigator.pop();
+    }
+  }
 }

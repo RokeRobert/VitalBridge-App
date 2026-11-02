@@ -70,6 +70,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class FcmService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  static bool alertaSosAbierta = false;
 
   /// Inicializa los oyentes de notificaciones push de Firebase
   static Future<void> inicializar() async {
@@ -141,8 +142,15 @@ class FcmService {
 
   /// Navega de inmediato a la pantalla de emergencia SOS en pantalla completa
   static void abrirPantallaAlertaSos(Map<String, dynamic> data) {
+    if (alertaSosAbierta) {
+      debugPrint('FcmService: Alerta SOS ya abierta en pantalla, ignorando llamada duplicada.');
+      return;
+    }
+
     final context = AlarmasNativasService.navigatorKey.currentContext;
     if (context == null) return;
+
+    alertaSosAbierta = true;
 
     final idAlerta = int.tryParse(data['idAlerta']?.toString() ?? '0');
     final latitud = double.tryParse(data['latitud']?.toString() ?? '');

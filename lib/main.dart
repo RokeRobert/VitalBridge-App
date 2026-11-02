@@ -22,6 +22,7 @@ void main() async {
 
   Widget pantallaInicial;
   if (payloadAlarma != null) {
+    AlarmasNativasService.alarmaAbierta = true;
     pantallaInicial = AlarmaMedicamentoScreen(
       idHorario: payloadAlarma['idHorario'] as int?,
       nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',
@@ -45,7 +46,9 @@ void main() async {
 
   // Respaldo por si la navegación requirió el Navigator montado
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    AlarmasNativasService.verificarLanzamientoDesdeNotificacion();
+    if (payloadAlarma == null) {
+      AlarmasNativasService.verificarLanzamientoDesdeNotificacion();
+    }
   });
 }
 

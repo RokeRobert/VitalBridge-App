@@ -1,6 +1,8 @@
 package com.example.vital_bridge
 
 import android.app.AlarmManager
+import android.app.KeyguardManager
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -43,6 +45,10 @@ class MainActivity : FlutterActivity() {
             WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
             WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            keyguardManager?.requestDismissKeyguard(this, null)
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -85,6 +91,31 @@ class MainActivity : FlutterActivity() {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         try {
                             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                                data = Uri.parse("package:$packageName")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            abrirAjustesApp()
+                            result.success(true)
+                        }
+                    } else {
+                        result.success(false)
+                    }
+                }
+                "verificarPermisoPantallaCompleta" -> {
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+                        result.success(notificationManager?.canUseFullScreenIntent() ?: true)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "abrirAjustesPantallaCompleta" -> {
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        try {
+                            val intent = Intent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT").apply {
                                 data = Uri.parse("package:$packageName")
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }

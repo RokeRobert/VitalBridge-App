@@ -20,6 +20,9 @@ class AlarmasNativasService {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
+  /// Bandera para evitar abrir pantallas de alarma duplicadas
+  static bool alarmaAbierta = false;
+
   static const String _channelId = 'vitalbridge_alarmas_medicas_v4';
   static const String _channelName = 'Alarmas de Medicamentos';
   static const String _channelDesc =
@@ -87,6 +90,10 @@ class AlarmasNativasService {
 
   /// Manejador de evento cuando el usuario interactúa con la notificación o Android dispara el intent
   static void _alRecibirNotificacion(NotificationResponse response) {
+    if (alarmaAbierta) {
+      debugPrint('AlarmasNativas: Alarma ya en pantalla, omitiendo duplicado.');
+      return;
+    }
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
 
@@ -120,6 +127,7 @@ class AlarmasNativasService {
 
   /// Verifica si la aplicación fue abierta por una alarma nativa mientras estaba cerrada
   static Future<void> verificarLanzamientoDesdeNotificacion() async {
+    if (alarmaAbierta) return;
     try {
       final datos = await obtenerPayloadLanzamiento();
       if (datos != null) {
@@ -144,6 +152,9 @@ class AlarmasNativasService {
     required String hora,
     required String indicaciones,
   }) {
+    if (alarmaAbierta) return;
+    alarmaAbierta = true;
+
     navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (context) => AlarmaMedicamentoScreen(
@@ -154,7 +165,9 @@ class AlarmasNativasService {
           indicaciones: indicaciones,
         ),
       ),
-    );
+    ).then((_) {
+      alarmaAbierta = false;
+    });
   }
 
   /// Parsea la hora en formato '08:00 AM', '14:30', '08:00:00', etc.
@@ -202,11 +215,11 @@ class AlarmasNativasService {
 
     // Si la hora ya pasó hoy por más de 15 minutos, no la programamos en el pasado lejano
     if (fechaAlarma.isBefore(ahora.subtract(const Duration(minutes: 15)))) {
-      debugPrint('AlarmasNativas: Toma ${toma.medicamento} a las ${toma.horaProgramada} ya expiró hoy.');
+      debugPrint('AlarmasNativas: Toma ${toma.medicamento} a las ${toma.horaProgramada} ya expiro hoy.');
       return;
     }
 
-    // Si la hora coincide con el minuto actual o pasó hace unos instantes (ej. prueba del usuario),
+    // Si la hora coincide con el minuto actual o pasó hace unos instantes,
     // la programamos 5 segundos hacia el futuro para que suene de inmediato sin crashear el AlarmManager
     if (!fechaAlarma.isAfter(ahora)) {
       fechaAlarma = ahora.add(const Duration(seconds: 5));
@@ -244,20 +257,20 @@ class AlarmasNativasService {
       // Se registra como reloj de alarma del sistema y despierta el teléfono incluso en modo Doze
       await _notifications.zonedSchedule(
         id: toma.idHorario,
-        title: '⏰ ¡Hora de tu medicamento!',
+        title: '¡Hora de tu medicamento!',
         body: 'Es momento de tomar ${toma.medicamento} (${toma.dosis}).',
         scheduledDate: fechaAlarma,
         notificationDetails: NotificationDetails(android: androidDetails),
         androidScheduleMode: AndroidScheduleMode.alarmClock,
         payload: payload,
       );
-      debugPrint('AlarmasNativas: ✅ Alarma registrada exitosamente para id ${toma.idHorario}');
+      debugPrint('AlarmasNativas: Alarma registrada exitosamente para id ${toma.idHorario}');
     } catch (e) {
       debugPrint('AlarmasNativas: Aviso: Falló exactAlarmClock, intentando exactAllowWhileIdle: $e');
       try {
         await _notifications.zonedSchedule(
           id: toma.idHorario,
-          title: '⏰ ¡Hora de tu medicamento!',
+          title: '¡Hora de tu medicamento!',
           body: 'Es momento de tomar ${toma.medicamento} (${toma.dosis}).',
           scheduledDate: fechaAlarma,
           notificationDetails: NotificationDetails(android: androidDetails),
@@ -329,6 +342,21 @@ class AlarmasNativasService {
   static Future<void> abrirAjustesAparecerEncima() async {
     try {
       await _channelPermisos.invokeMethod('abrirAjustesAparecerEncima');
+    } catch (_) {}
+  }
+
+  static Future<bool> tienePermisoPantallaCompleta() async {
+    try {
+      final res = await _channelPermisos.invokeMethod<bool>('verificarPermisoPantallaCompleta');
+      return res ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  static Future<void> abrirAjustesPantallaCompleta() async {
+    try {
+      await _channelPermisos.invokeMethod('abrirAjustesPantallaCompleta');
     } catch (_) {}
   }
 

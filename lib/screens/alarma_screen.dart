@@ -43,6 +43,7 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
 
   @override
   void dispose() {
+    AlarmasNativasService.alarmaAbierta = false;
     _detenerAlarmaSonido();
     _audioPlayer.dispose();
     super.dispose();
@@ -84,7 +85,7 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('🔇 Sonido de alarma silenciado.'),
+        content: Text('Sonido de alarma silenciado.'),
         duration: Duration(seconds: 2),
       ),
     );
@@ -117,8 +118,8 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
       SnackBar(
         content: Text(
           exito
-              ? '✅ ¡Toma registrada exitosamente en VitalBridge!'
-              : '⚠️ No se pudo confirmar la toma en el servidor.',
+              ? 'Toma registrada exitosamente en VitalBridge.'
+              : 'No se pudo confirmar la toma en el servidor.',
         ),
         backgroundColor: exito ? const Color(0xFF336C60) : const Color(0xFFE25C54),
         duration: const Duration(seconds: 3),
@@ -127,6 +128,7 @@ class _AlarmaMedicamentoScreenState extends State<AlarmaMedicamentoScreen> {
   }
 
   void _cerrarAplicacion() {
+    AlarmasNativasService.alarmaAbierta = false;
     _detenerAlarmaSonido();
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop(_tomaConfirmada);

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
@@ -26,6 +27,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   String? _idPaciente;
   final Set<int> _tomasEnProceso = {};
   bool _faltanPermisosAlarma = false;
+  DateTime? _ultimoAtrasPresionado;
 
   // Canales en tiempo real de Supabase
   RealtimeChannel? _canalTratamientos;
@@ -92,9 +94,10 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   Future<void> _verificarPermisosSistema() async {
     final tieneAparecerEncima = await AlarmasNativasService.tienePermisoAparecerEncima();
     final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
+    final tienePantallaCompleta = await AlarmasNativasService.tienePermisoPantallaCompleta();
     if (mounted) {
       setState(() {
-        _faltanPermisosAlarma = !tieneAparecerEncima || !tieneAlarmasExactas;
+        _faltanPermisosAlarma = !tieneAparecerEncima || !tieneAlarmasExactas || !tienePantallaCompleta;
       });
     }
   }
@@ -108,6 +111,11 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     final tieneAlarmasExactas = await AlarmasNativasService.tienePermisoAlarmasExactas();
     if (!tieneAlarmasExactas) {
       await AlarmasNativasService.abrirAjustesAlarmasExactas();
+      return;
+    }
+    final tienePantallaCompleta = await AlarmasNativasService.tienePermisoPantallaCompleta();
+    if (!tienePantallaCompleta) {
+      await AlarmasNativasService.abrirAjustesPantallaCompleta();
       return;
     }
   }
@@ -239,8 +247,8 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
       SnackBar(
         content: Text(
           exito
-              ? '✅ ¡Toma de ${toma.medicamento} confirmada!'
-              : '⚠️ Error al confirmar la toma.',
+              ? 'Toma de ${toma.medicamento} confirmada exitosamente.'
+              : 'Error al confirmar la toma.',
         ),
         backgroundColor: exito ? const Color(0xFF336C60) : const Color(0xFFE25C54),
         duration: const Duration(seconds: 3),
@@ -315,7 +323,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
 
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('🚨 ¡Alerta SOS enviada con éxito a tus contactos de emergencia!'),
+                  content: Text('Alerta SOS enviada con exito a tus contactos de emergencia.'),
                   backgroundColor: Color(0xFFE25C54),
                   duration: Duration(seconds: 4),
                 ),
@@ -626,7 +634,19 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _confirmarCerrarSesion();
+        final ahora = DateTime.now();
+        if (_ultimoAtrasPresionado == null ||
+            ahora.difference(_ultimoAtrasPresionado!) > const Duration(seconds: 2)) {
+          _ultimoAtrasPresionado = ahora;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Presiona atras de nuevo para salir de la aplicacion.'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          SystemNavigator.pop();
+        }
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F2), // Fondo suave crema

@@ -21,7 +21,7 @@ class PacienteScreen extends StatefulWidget {
 class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObserver {
   List<TomaModel> _tomasHoy = [];
   bool _cargando = true;
-  String _nombrePaciente = 'Miguel Angel';
+  String _nombrePaciente = 'Paciente';
   String? _idPaciente;
   final Set<int> _tomasEnProceso = {};
 
@@ -93,11 +93,35 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
 
     if (mounted) {
       setState(() {
-        if (nombreGuardado != null && nombreGuardado.isNotEmpty) {
+        if (nombreGuardado != null && nombreGuardado.isNotEmpty && nombreGuardado != 'Miguel Angel') {
           _nombrePaciente = nombreGuardado;
         }
         _idPaciente = idGuardado;
       });
+    }
+
+    // Consulta de respaldo a Supabase para recuperar el nombre real si no estaba en caché
+    if (_idPaciente != null && (_nombrePaciente == 'Paciente' || _nombrePaciente == 'Miguel Angel')) {
+      try {
+        final client = SupabaseService.client;
+        if (client != null) {
+          final res = await client
+              .from('paciente')
+              .select('nombre_paciente')
+              .eq('id_paciente', _idPaciente!)
+              .maybeSingle();
+
+          if (res != null) {
+            final nombreReal = res['nombre_paciente']?.toString().trim();
+            if (nombreReal != null && nombreReal.isNotEmpty && mounted) {
+              setState(() {
+                _nombrePaciente = nombreReal;
+              });
+              await prefs.setString('usuario_nombre', nombreReal);
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     await _cargarTomasHoy();

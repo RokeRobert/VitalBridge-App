@@ -139,6 +139,8 @@ class AuthService {
         await prefs.setString(_keyToken, token);
         await prefs.setString(_keyUsuarioId, paciente.id);
         await prefs.setString(_keyRol, 'paciente');
+        await prefs.setString('usuario_nombre', paciente.nombre);
+        await prefs.setString('usuario_apellidos', paciente.apellidos);
 
         return {'exito': true, 'paciente': paciente};
       } else {

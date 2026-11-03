@@ -16,6 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "vital_bridge/permisos_sistema"
+    private var methodChannel: MethodChannel? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,7 +30,22 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         configurarPantallaBloqueo()
+        procesarIntentAlarma(intent)
+    }
+
+    private fun procesarIntentAlarma(intent: Intent?) {
+        if (intent == null) return
+        val extras = intent.extras ?: return
+        var payload = extras.getString("payload")
+        if (payload.isNullOrEmpty()) {
+            payload = extras.getString("notification_payload")
+        }
+        if (!payload.isNullOrEmpty()) {
+            configurarPantallaBloqueo()
+            methodChannel?.invokeMethod("onAlarmaRecibida", payload)
+        }
     }
 
     private fun configurarPantallaBloqueo() {
@@ -68,8 +84,18 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+        methodChannel = channel
+        channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "obtenerPayloadAlarmaActual" -> {
+                    val extras = intent?.extras
+                    var payload = extras?.getString("payload")
+                    if (payload.isNullOrEmpty()) {
+                        payload = extras?.getString("notification_payload")
+                    }
+                    result.success(payload)
+                }
                 "verificarPermisoAlarmasExactas" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -173,6 +199,7 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        procesarIntentAlarma(intent)
     }
 
     private fun abrirAjustesApp() {

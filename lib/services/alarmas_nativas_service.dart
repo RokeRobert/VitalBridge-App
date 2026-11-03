@@ -10,6 +10,11 @@ import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/alarma_screen.dart';
 import 'package:vital_bridge/services/fcm_service.dart';
 
+@pragma('vm:entry-point')
+void notificationTapBackground(NotificationResponse notificationResponse) {
+  // Callback en segundo plano para cumplir contrato de flutter_local_notifications
+}
+
 /// Servicio centralizado de Alarmas Nativas para el Paciente.
 /// Utiliza Android AlarmManager (AlarmClock) para despertar el dispositivo
 /// a la hora exacta de la toma, incluso si la app está completamente cerrada.
@@ -63,7 +68,10 @@ class AlarmasNativasService {
     await _notifications.initialize(
       settings: initSettings,
       onDidReceiveNotificationResponse: _alRecibirNotificacion,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
     );
+
+    _configurarOyenteIntentNativo();
 
     // 3. Crear el canal de alta prioridad con sonido de alarma y vibración
     final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
@@ -115,6 +123,34 @@ class AlarmasNativasService {
     } catch (_) {}
   }
 
+  /// Configura el listener para intents nativos cuando Android despierta MainActivity
+  static void _configurarOyenteIntentNativo() {
+    _channelPermisos.setMethodCallHandler((call) async {
+      if (call.method == 'onAlarmaRecibida') {
+        final payloadStr = call.arguments?.toString();
+        if (payloadStr != null && payloadStr.isNotEmpty) {
+          try {
+            final Map<String, dynamic> datos = jsonDecode(payloadStr);
+            cancelarTodasLasNotificacionesActivas();
+            if (datos['tipo'] == 'SOS') {
+              FcmService.abrirPantallaAlertaSos(datos);
+            } else {
+              abrirPantallaAlarmaDirecta(
+                idHorario: datos['idHorario'] as int?,
+                nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',
+                dosis: datos['dosis'] as String? ?? '',
+                hora: datos['hora'] as String? ?? '',
+                indicaciones: datos['indicaciones'] as String? ?? '',
+              );
+            }
+          } catch (e) {
+            debugPrint('AlarmasNativas: Error procesando intent nativo: $e');
+          }
+        }
+      }
+    });
+  }
+
   /// Retorna el payload de notificación si la app fue abierta por una alarma
   static Future<Map<String, dynamic>?> obtenerPayloadLanzamiento() async {
     try {
@@ -128,6 +164,15 @@ class AlarmasNativasService {
         }
       }
     } catch (_) {}
+
+    // Respaldo desde el intent nativo de Android
+    try {
+      final payloadNativo = await _channelPermisos.invokeMethod<String>('obtenerPayloadAlarmaActual');
+      if (payloadNativo != null && payloadNativo.isNotEmpty) {
+        return jsonDecode(payloadNativo) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+
     return null;
   }
 
@@ -148,6 +193,25 @@ class AlarmasNativasService {
     } catch (e) {
       debugPrint('AlarmasNativas: Error al verificar lanzamiento: $e');
     }
+  }
+
+  /// Abre la pantalla de alarma directamente sin depender de la interacción del usuario
+  static void abrirPantallaAlarmaDirecta({
+    required int? idHorario,
+    required String nombreMedicamento,
+    required String dosis,
+    required String hora,
+    required String indicaciones,
+  }) {
+    if (alarmaAbierta) return;
+    cancelarTodasLasNotificacionesActivas();
+    _abrirPantallaAlarma(
+      idHorario: idHorario,
+      nombreMedicamento: nombreMedicamento,
+      dosis: dosis,
+      hora: hora,
+      indicaciones: indicaciones,
+    );
   }
 
   /// Navega directamente a la pantalla de alarma en pantalla completa

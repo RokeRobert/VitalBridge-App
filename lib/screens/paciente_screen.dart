@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +29,7 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
   final Set<int> _tomasEnProceso = {};
   bool _faltanPermisosAlarma = false;
   DateTime? _ultimoAtrasPresionado;
+  Timer? _relojTomasTimer;
 
   // Canales en tiempo real de Supabase
   RealtimeChannel? _canalTratamientos;
@@ -40,15 +42,50 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
     WidgetsBinding.instance.addObserver(this);
     _cargarDatosIniciales();
     _iniciarRealtime();
+    _iniciarRelojTomas();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _relojTomasTimer?.cancel();
     _canalTratamientos?.unsubscribe();
     _canalHorarios?.unsubscribe();
     _canalTomas?.unsubscribe();
     super.dispose();
+  }
+
+  void _iniciarRelojTomas() {
+    _relojTomasTimer?.cancel();
+    _relojTomasTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      if (!mounted || AlarmasNativasService.alarmaAbierta) return;
+      _comprobarTomaEnCurso();
+    });
+  }
+
+  void _comprobarTomaEnCurso() {
+    if (_tomasHoy.isEmpty || AlarmasNativasService.alarmaAbierta) return;
+    final ahora = DateTime.now();
+
+    for (final toma in _tomasHoy) {
+      if (toma.esTomada) continue;
+      final horaToma = _parsearHora(toma.horaProgramada, ahora);
+      final diferencia = ahora.difference(horaToma);
+      // Si la hora de la toma ya llegó y está dentro de una ventana de 15 minutos
+      if (diferencia.inSeconds >= 0 && diferencia.inMinutes < 15) {
+        if (!_tomasEnProceso.contains(toma.idHorario)) {
+          _tomasEnProceso.add(toma.idHorario);
+          AlarmasNativasService.abrirPantallaAlarmaDirecta(
+            idHorario: toma.idHorario,
+            nombreMedicamento: toma.medicamento,
+            dosis: toma.dosis,
+            hora: toma.horaProgramada,
+            indicaciones: toma.indicaciones ?? 'Tomar según prescripción médica',
+          );
+          break;
+        }
+      }
+    }
   }
 
   void _iniciarRealtime() {

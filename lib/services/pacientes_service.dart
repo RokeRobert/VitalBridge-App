@@ -12,20 +12,33 @@ class PacientesService {
   // Caché en memoria para desarrollo y modo offline
   static final List<PacienteModel> _pacientesEnMemoria = [];
 
+  /// Limpia la caché en memoria al cerrar sesión o cambiar de cuenta
+  static void limpiarCache() {
+    _pacientesEnMemoria.clear();
+  }
+
   /// Obtiene los pacientes vinculados al cuidador activo
   static Future<List<PacienteModel>> obtenerPacientes() async {
     final prefs = await SharedPreferences.getInstance();
-    try {
-      final token = prefs.getString('auth_token') ?? '';
-      final usuarioId = prefs.getString('auth_user_id') ?? '';
+    final token = prefs.getString('auth_token') ?? '';
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
 
+    // Si no hay un usuario cuidador autenticado, no hay pacientes que consultar
+    if (usuarioId.isEmpty) {
+      _pacientesEnMemoria.clear();
+      return [];
+    }
+
+    final cacheKey = 'cache_pacientes_json_$usuarioId';
+
+    try {
       final response = await http
           .get(
             Uri.parse(ApiConstants.pacientePerfil),
             headers: {
               'Content-Type': 'application/json',
               if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-              if (usuarioId.isNotEmpty) 'X-User-Id': usuarioId,
+              'X-User-Id': usuarioId,
             },
           )
           .timeout(const Duration(seconds: 10));
@@ -35,7 +48,7 @@ class PacientesService {
         final pacientes = listaJson.map((j) => PacienteModel.fromJson(j)).toList();
         _pacientesEnMemoria.clear();
         _pacientesEnMemoria.addAll(pacientes);
-        await prefs.setString('cache_pacientes_json', jsonEncode(listaJson));
+        await prefs.setString(cacheKey, jsonEncode(listaJson));
         return pacientes;
       } else {
         // ignore: avoid_print
@@ -46,8 +59,8 @@ class PacientesService {
       print('Error en PacientesService.obtenerPacientes: $e\n$stack');
     }
 
-    // Respaldo de persistencia local
-    final cachedJson = prefs.getString('cache_pacientes_json');
+    // Respaldo de persistencia local indexado por el ID del cuidador activo
+    final cachedJson = prefs.getString(cacheKey);
     if (cachedJson != null && cachedJson.isNotEmpty) {
       try {
         final List<dynamic> decoded = jsonDecode(cachedJson);
@@ -57,7 +70,7 @@ class PacientesService {
         return cachedPacientes;
       } catch (e) {
         // ignore: avoid_print
-        print('Error leyendo cache_pacientes_json: $e');
+        print('Error leyendo $cacheKey: $e');
       }
     }
 
@@ -74,7 +87,16 @@ class PacientesService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('auth_token') ?? '';
-    final usuarioId = prefs.getString('auth_user_id') ?? '00000000-0000-0000-0000-000000000001';
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
+
+    if (usuarioId.isEmpty) {
+      return {
+        'exito': false,
+        'mensaje': 'No se encontró una sesión activa de cuidador.',
+      };
+    }
+
+    final cacheKey = 'cache_pacientes_json_$usuarioId';
 
     // Generar un código de token seguro de alta entropía (ej: VB-7K9M-4X2P)
     const alfabeto = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -111,7 +133,7 @@ class PacientesService {
         final nuevoPaciente = PacienteModel.fromJson(data['paciente'] ?? data);
         _pacientesEnMemoria.add(nuevoPaciente);
         await prefs.setString(
-          'cache_pacientes_json',
+          cacheKey,
           jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
         );
 
@@ -169,6 +191,13 @@ class PacientesService {
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         _pacientesEnMemoria.removeWhere((p) => p.id == idPaciente);
+        final usuarioId = prefs.getString('auth_user_id') ?? '';
+        if (usuarioId.isNotEmpty) {
+          await prefs.setString(
+            'cache_pacientes_json_$usuarioId',
+            jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
+          );
+        }
         return true;
       }
     } catch (_) {

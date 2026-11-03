@@ -39,10 +39,10 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
   final TextEditingController _telefonoController = TextEditingController();
 
   // Valores guardados del cuidador para revertir en caso de cancelar
-  String _savedNombre = 'María';
-  String _savedApellidos = 'García';
-  String _savedEmail = 'maria@vitalbridge.es';
-  String _savedTelefono = '+34 601 234 567';
+  String _savedNombre = '';
+  String _savedApellidos = '';
+  String _savedEmail = '';
+  String _savedTelefono = '';
 
   // Lista de pacientes asignados al cuidador
   List<PacienteModel> _pacientes = [];
@@ -76,17 +76,17 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
       final res = await PerfilesService.obtenerPerfilUsuario(usuarioId);
       if (res['exito'] == true && res['data'] != null) {
         final d = res['data'];
-        _savedNombre = d['nombre'] ?? prefs.getString('usuario_nombre') ?? 'María';
-        _savedApellidos = d['apellidos'] ?? prefs.getString('usuario_apellidos') ?? 'García';
-        _savedEmail = d['correo'] ?? prefs.getString('usuario_correo') ?? 'maria@vitalbridge.es';
-        _savedTelefono = d['telefono'] ?? prefs.getString('usuario_telefono') ?? '+34 601 234 567';
+        _savedNombre = d['nombre'] ?? prefs.getString('usuario_nombre') ?? '';
+        _savedApellidos = d['apellidos'] ?? prefs.getString('usuario_apellidos') ?? '';
+        _savedEmail = d['correo'] ?? prefs.getString('usuario_correo') ?? '';
+        _savedTelefono = d['telefono'] ?? prefs.getString('usuario_telefono') ?? '';
         _fotoUrl = d['foto'] ?? prefs.getString('usuario_foto');
       }
     } else {
-      _savedNombre = prefs.getString('usuario_nombre') ?? 'María';
-      _savedApellidos = prefs.getString('usuario_apellidos') ?? 'García';
-      _savedEmail = prefs.getString('usuario_correo') ?? 'maria@vitalbridge.es';
-      _savedTelefono = prefs.getString('usuario_telefono') ?? '+34 601 234 567';
+      _savedNombre = prefs.getString('usuario_nombre') ?? '';
+      _savedApellidos = prefs.getString('usuario_apellidos') ?? '';
+      _savedEmail = prefs.getString('usuario_correo') ?? '';
+      _savedTelefono = prefs.getString('usuario_telefono') ?? '';
       _fotoUrl = prefs.getString('usuario_foto');
     }
 

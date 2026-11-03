@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // SERVICIO DE GESTIÃ“N DE PERFILES Y FOTOS (perfiles_service.dart)
 // ============================================================================
 // Este servicio encapsula:
@@ -146,15 +146,15 @@ class PerfilesService {
       }
     } catch (_) {}
 
-    // CachÃ© local si no hubo conexiÃ³n con el backend
+    // Caché local si no hubo conexión con el backend
     return {
       'exito': true,
       'data': {
         'idUsuario': idUsuario,
-        'nombre': prefs.getString('usuario_nombre') ?? 'MarÃ­a',
-        'apellidos': prefs.getString('usuario_apellidos') ?? 'GarcÃ­a',
-        'correo': prefs.getString('usuario_correo') ?? 'maria@vitalbridge.es',
-        'telefono': prefs.getString('usuario_telefono') ?? '+34 601 234 567',
+        'nombre': prefs.getString('usuario_nombre') ?? '',
+        'apellidos': prefs.getString('usuario_apellidos') ?? '',
+        'correo': prefs.getString('usuario_correo') ?? '',
+        'telefono': prefs.getString('usuario_telefono') ?? '',
         'foto': prefs.getString('usuario_foto'),
       }
     };

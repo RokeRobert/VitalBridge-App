@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/models/paciente_model.dart';
 import 'package:vital_bridge/models/usuario_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
+import 'package:vital_bridge/services/pacientes_service.dart';
+import 'package:vital_bridge/services/tratamientos_service.dart';
 
 class AuthService {
   static const String _keyToken = 'auth_token';
@@ -42,6 +44,11 @@ class AuthService {
 
         // Guardar sesión en el teléfono
         final prefs = await SharedPreferences.getInstance();
+        final usuarioIdAnterior = prefs.getString(_keyUsuarioId);
+        if (usuarioIdAnterior != usuario.id) {
+          await _limpiarCachesLocales(prefs);
+        }
+
         await prefs.setString(_keyToken, usuario.token ?? 'token_simulado');
         await prefs.setString(_keyUsuarioId, usuario.id);
         await prefs.setString(_keyRol, 'cuidador');
@@ -100,7 +107,30 @@ class AuthService {
 
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {'exito': true, 'data': data};
+        final dynamic userRaw = data['usuario'] ?? data;
+        final Map<String, dynamic> userMap = (userRaw is Map)
+            ? userRaw.cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final usuario = UsuarioModel.fromJson(userMap);
+
+        // Limpiar cachés de cualquier cuenta previa en el dispositivo
+        final prefs = await SharedPreferences.getInstance();
+        await _limpiarCachesLocales(prefs);
+
+        // Guardar sesión activa del nuevo cuidador registrado
+        await prefs.setString(_keyToken, usuario.token ?? '');
+        await prefs.setString(_keyUsuarioId, usuario.id);
+        await prefs.setString(_keyRol, 'cuidador');
+        await prefs.setString('usuario_nombre', usuario.nombre.isNotEmpty ? usuario.nombre : nombre.trim());
+        await prefs.setString('usuario_apellidos', usuario.apellidos.isNotEmpty ? usuario.apellidos : apellidos.trim());
+        await prefs.setString('usuario_correo', usuario.correo.isNotEmpty ? usuario.correo : correo.trim());
+        await prefs.setString('usuario_telefono', usuario.telefono.isNotEmpty ? usuario.telefono : telefono.trim());
+        if (usuario.foto != null && usuario.foto!.isNotEmpty) {
+          await prefs.setString('usuario_foto', usuario.foto!);
+        }
+
+        return {'exito': true, 'data': data, 'usuario': usuario};
       } else {
         final error = jsonDecode(response.body);
         return {
@@ -174,6 +204,19 @@ class AuthService {
     await prefs.remove('usuario_correo');
     await prefs.remove('usuario_telefono');
     await prefs.remove('usuario_foto');
+    await _limpiarCachesLocales(prefs);
+  }
+
+  /// Limpia cachés en disco y memoria volátil
+  static Future<void> _limpiarCachesLocales(SharedPreferences prefs) async {
+    final keys = prefs.getKeys().toList();
+    for (var k in keys) {
+      if (k.startsWith('cache_') || k.startsWith('cola_')) {
+        await prefs.remove(k);
+      }
+    }
+    PacientesService.limpiarCache();
+    TratamientosService.limpiarCache();
   }
 
   /// Obtiene el ID del usuario actual en sesión

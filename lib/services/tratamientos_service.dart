@@ -103,6 +103,12 @@ class TratamientosService {
   // Registro de tomas confirmadas en memoria volátil
   static final Map<int, DateTime> _tomasConfirmadasMap = {};
 
+  /// Limpia la memoria volátil de tratamientos y tomas al cerrar sesión o cambiar de cuenta
+  static void limpiarCache() {
+    _tratamientosSimulados.clear();
+    _tomasConfirmadasMap.clear();
+  }
+
   /// Obtiene los headers de autenticación almacenados
   static Future<Map<String, String>> _obtenerHeaders() async {
     final prefs = await SharedPreferences.getInstance();
@@ -348,13 +354,11 @@ class TratamientosService {
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        if (data.isNotEmpty) {
-          final tomasDesdeApi = data.map((item) => TomaModel.fromJson(item)).toList();
+        final tomasDesdeApi = data.map((item) => TomaModel.fromJson(item)).toList();
 
-          // Guardar copia exacta en disco local para modo offline
-          await prefs.setString(_keyCacheTomasHoy, jsonEncode(data));
-          return tomasDesdeApi;
-        }
+        // Guardar copia exacta en disco local para modo offline
+        await prefs.setString(_keyCacheTomasHoy, jsonEncode(data));
+        return tomasDesdeApi;
       }
     } catch (e) {
       // ignore: avoid_print

@@ -76,8 +76,8 @@ class _LoginScreenState extends State<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res['modoSimulacion'] == true
-                ? '✅ Sesión iniciada (Modo desarrollo / offline)'
-                : '✅ Bienvenido a VitalBridge'),
+                ? 'Sesión iniciada (Modo desarrollo / offline)'
+                : 'Bienvenido a VitalBridge'),
             backgroundColor: const Color(0xFF336C60),
             duration: const Duration(seconds: 2),
           ),
@@ -257,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                              '✅ ¡Código QR escaneado con éxito! Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
+                              'Código QR escaneado con éxito. Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
                             ),
                             backgroundColor: const Color(0xFF336C60),
                           ),
@@ -325,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  '✅ ¡Vinculado exitosamente! Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
+                                  'Vinculado exitosamente. Bienvenido, ${res['paciente']?.nombre ?? 'Paciente'}.',
                                 ),
                                 backgroundColor: const Color(0xFF336C60),
                               ),

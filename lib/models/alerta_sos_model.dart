@@ -23,9 +23,20 @@ class AlertaSosModel {
 
   bool get esActiva => idEstadoAlerta == 1 || estado.toLowerCase() == 'activa';
 
+  static DateTime _parseUtc(dynamic val) {
+    if (val == null) return DateTime.now();
+    var s = val.toString().trim();
+    if (s.isEmpty) return DateTime.now();
+    if (!s.endsWith('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
+      s += 'Z';
+    }
+    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
+  }
+
   String get horaLegible {
-    final hora = fechaCreacion.hour.toString().padLeft(2, '0');
-    final min = fechaCreacion.minute.toString().padLeft(2, '0');
+    final local = fechaCreacion.toLocal();
+    final hora = local.hour.toString().padLeft(2, '0');
+    final min = local.minute.toString().padLeft(2, '0');
     return '$hora:$min';
   }
 
@@ -44,11 +55,7 @@ class AlertaSosModel {
       nombrePaciente: (json['nombrePaciente'] ??
               (json['paciente'] is Map ? json['paciente']['nombrePaciente'] : null))
           ?.toString(),
-      fechaCreacion: json['fechaCreacion'] != null
-          ? DateTime.tryParse(json['fechaCreacion'].toString()) ?? DateTime.now()
-          : (json['fecha_creacion'] != null
-              ? DateTime.tryParse(json['fecha_creacion'].toString()) ?? DateTime.now()
-              : DateTime.now()),
+      fechaCreacion: _parseUtc(json['fechaCreacion'] ?? json['fecha_creacion']),
       idEstadoAlerta: int.tryParse((json['idEstadoAlerta'] ?? json['id_estado_alerta'] ?? 1).toString()) ?? 1,
       estado: (json['estado'] ??
               (json['estadoAlerta'] is Map ? json['estadoAlerta']['nombreEstado'] : null) ??
@@ -63,8 +70,10 @@ class AlertaSosModel {
     return {
       if (id > 0) 'idAlerta': id,
       'idPaciente': idPaciente,
+      if (nombrePaciente != null) 'nombrePaciente': nombrePaciente,
       'fechaCreacion': fechaCreacion.toIso8601String(),
       'idEstadoAlerta': idEstadoAlerta,
+      'estado': estado,
       if (latitud != null) 'latitud': latitud,
       if (longitud != null) 'longitud': longitud,
     };

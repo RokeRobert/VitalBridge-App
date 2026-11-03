@@ -54,12 +54,13 @@ void main() async {
     } else {
       AlarmasNativasService.alarmaAbierta = true;
       AlarmasNativasService.cancelarTodasLasNotificacionesActivas();
+      final idHorario = int.tryParse(payloadAlarma['idHorario']?.toString() ?? '');
       pantallaInicial = AlarmaMedicamentoScreen(
-        idHorario: payloadAlarma['idHorario'] as int?,
-        nombreMedicamento: payloadAlarma['nombreMedicamento'] as String? ?? 'Medicamento',
-        dosis: payloadAlarma['dosis'] as String? ?? '',
-        hora: payloadAlarma['hora'] as String? ?? '',
-        indicaciones: payloadAlarma['indicaciones'] as String? ?? '',
+        idHorario: idHorario,
+        nombreMedicamento: payloadAlarma['nombreMedicamento']?.toString() ?? 'Medicamento',
+        dosis: payloadAlarma['dosis']?.toString() ?? '',
+        hora: payloadAlarma['hora']?.toString() ?? '',
+        indicaciones: payloadAlarma['indicaciones']?.toString() ?? '',
       );
     }
   } else if (token != null && token.isNotEmpty) {

@@ -114,11 +114,11 @@ class AlarmasNativasService {
         return;
       }
       _abrirPantallaAlarma(
-        idHorario: datos['idHorario'] as int?,
-        nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',
-        dosis: datos['dosis'] as String? ?? '',
-        hora: datos['hora'] as String? ?? '',
-        indicaciones: datos['indicaciones'] as String? ?? '',
+        idHorario: int.tryParse(datos['idHorario']?.toString() ?? ''),
+        nombreMedicamento: datos['nombreMedicamento']?.toString() ?? 'Medicamento',
+        dosis: datos['dosis']?.toString() ?? '',
+        hora: datos['hora']?.toString() ?? '',
+        indicaciones: datos['indicaciones']?.toString() ?? '',
       );
     } catch (_) {}
   }
@@ -136,11 +136,11 @@ class AlarmasNativasService {
               FcmService.abrirPantallaAlertaSos(datos);
             } else {
               abrirPantallaAlarmaDirecta(
-                idHorario: datos['idHorario'] as int?,
-                nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',
-                dosis: datos['dosis'] as String? ?? '',
-                hora: datos['hora'] as String? ?? '',
-                indicaciones: datos['indicaciones'] as String? ?? '',
+                idHorario: int.tryParse(datos['idHorario']?.toString() ?? ''),
+                nombreMedicamento: datos['nombreMedicamento']?.toString() ?? 'Medicamento',
+                dosis: datos['dosis']?.toString() ?? '',
+                hora: datos['hora']?.toString() ?? '',
+                indicaciones: datos['indicaciones']?.toString() ?? '',
               );
             }
           } catch (e) {
@@ -183,11 +183,11 @@ class AlarmasNativasService {
       final datos = await obtenerPayloadLanzamiento();
       if (datos != null) {
         _abrirPantallaAlarma(
-          idHorario: datos['idHorario'] as int?,
-          nombreMedicamento: datos['nombreMedicamento'] as String? ?? 'Medicamento',
-          dosis: datos['dosis'] as String? ?? '',
-          hora: datos['hora'] as String? ?? '',
-          indicaciones: datos['indicaciones'] as String? ?? '',
+          idHorario: int.tryParse(datos['idHorario']?.toString() ?? ''),
+          nombreMedicamento: datos['nombreMedicamento']?.toString() ?? 'Medicamento',
+          dosis: datos['dosis']?.toString() ?? '',
+          hora: datos['hora']?.toString() ?? '',
+          indicaciones: datos['indicaciones']?.toString() ?? '',
         );
       }
     } catch (e) {
@@ -353,6 +353,13 @@ class AlarmasNativasService {
         debugPrint('AlarmasNativas: Error definitivo al programar alarma: $e2');
       }
     }
+
+    // Programar también con el AlarmManager nativo para garantizar despertar de pantalla completa
+    await programarAlarmaExactaNativa(
+      toma.idHorario,
+      fechaAlarma.millisecondsSinceEpoch,
+      payload,
+    );
   }
 
   /// Cancela una alarma de toma (por ejemplo cuando el usuario ya confirmó que la tomó)
@@ -361,6 +368,7 @@ class AlarmasNativasService {
       await _notifications.cancel(id: idHorario);
       debugPrint('AlarmasNativas: Alarma cancelada para id $idHorario');
     } catch (_) {}
+    await cancelarAlarmaNativa(idHorario);
   }
 
   /// Cancela todas las notificaciones activas para silenciar de inmediato el sonido del sistema
@@ -464,5 +472,27 @@ class AlarmasNativasService {
     } catch (_) {
       SystemNavigator.pop();
     }
+  }
+
+  static Future<void> programarAlarmaExactaNativa(int idHorario, int triggerTimeMillis, String payloadJson) async {
+    try {
+      await _channelPermisos.invokeMethod('programarAlarmaExactaNativa', {
+        'idHorario': idHorario,
+        'triggerTimeMillis': triggerTimeMillis,
+        'payload': payloadJson,
+      });
+    } catch (_) {}
+  }
+
+  static Future<void> cancelarAlarmaNativa(int idHorario) async {
+    try {
+      await _channelPermisos.invokeMethod('cancelarAlarmaNativa', {'idHorario': idHorario});
+    } catch (_) {}
+  }
+
+  static Future<void> abrirEnlace(String url) async {
+    try {
+      await _channelPermisos.invokeMethod('abrirEnlace', {'url': url});
+    } catch (_) {}
   }
 }

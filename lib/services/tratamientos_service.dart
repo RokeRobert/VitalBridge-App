@@ -382,7 +382,7 @@ class TratamientosService {
             if (index != -1) {
               tomasEnCache[index] = tomasEnCache[index].copyWith(
                 estado: 'Tomada',
-                horaTomada: DateTime.tryParse(p['horaTomada'].toString()) ?? DateTime.now(),
+                horaTomada: TomaModel.parseUtc(p['horaTomada']) ?? DateTime.now(),
               );
             }
           }

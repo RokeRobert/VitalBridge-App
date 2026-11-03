@@ -26,7 +26,19 @@ class TomaModel {
   /// Determina si ya fue registrada como tomada
   bool get esTomada => estado.toLowerCase() == 'tomada';
 
-  /// Hora confirmada legible
+  /// Convierte cualquier representación de fecha/hora a DateTime en hora local del dispositivo
+  static DateTime? parseUtc(dynamic val) {
+    if (val == null) return null;
+    var s = val.toString().trim();
+    if (s.isEmpty) return null;
+    // Si no contiene indicador de zona horaria (Z o +/-), se asume UTC
+    if (!s.endsWith('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
+      s += 'Z';
+    }
+    return DateTime.tryParse(s)?.toLocal();
+  }
+
+  /// Hora confirmada legible en hora local
   String? get horaConfirmadaLegible {
     if (horaTomada == null) return null;
     final local = horaTomada!.toLocal();
@@ -66,11 +78,7 @@ class TomaModel {
       medicamento: (json['medicamento'] ?? json['nombre'] ?? '').toString(),
       dosis: (json['dosis'] ?? json['cantidad'] ?? '1 tableta').toString(),
       horaProgramada: (json['horaProgramada'] ?? json['hora'] ?? '8:00 AM').toString(),
-      horaTomada: json['horaTomada'] != null
-          ? DateTime.tryParse(json['horaTomada'].toString())
-          : (json['hora_tomada'] != null
-              ? DateTime.tryParse(json['hora_tomada'].toString())
-              : null),
+      horaTomada: parseUtc(json['horaTomada'] ?? json['hora_tomada']),
       estado: (json['estado'] ?? json['nombreEstado'] ?? 'Pendiente').toString(),
       observaciones: json['observaciones']?.toString(),
       indicaciones: json['indicaciones']?.toString(),

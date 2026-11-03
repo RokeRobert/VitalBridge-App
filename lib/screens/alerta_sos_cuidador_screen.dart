@@ -162,6 +162,13 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
   }
 
   void _verUbicacion() {
+    final tieneCoordenadas = widget.latitud != null && widget.longitud != null;
+    final latStr = widget.latitud != null ? widget.latitud!.toStringAsFixed(6) : null;
+    final lngStr = widget.longitud != null ? widget.longitud!.toStringAsFixed(6) : null;
+    final urlMaps = tieneCoordenadas
+        ? 'https://www.google.com/maps/search/?api=1&query=${widget.latitud},${widget.longitud}'
+        : null;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -196,16 +203,16 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                   child: const Icon(Icons.location_on_rounded, color: Color(0xFF5E5482), size: 24),
                 ),
                 const SizedBox(width: 12),
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Ubicación en Tiempo Real',
                       style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.azulOscuro),
                     ),
                     Text(
-                      'GPS Activo • Precisión: 5 metros',
-                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      tieneCoordenadas ? 'GPS Satelital Activo' : 'GPS no disponible',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                     ),
                   ],
                 ),
@@ -213,35 +220,66 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
             ),
             const SizedBox(height: 20),
             Container(
-              height: 140,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               decoration: BoxDecoration(
                 color: const Color(0xFFEDF2F7),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: const Color(0xFFCBD5E1)),
               ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.pin_drop_rounded, size: 40, color: Color(0xFFE25C54)),
-                    SizedBox(height: 6),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.pin_drop_rounded, size: 40, color: Color(0xFFE25C54)),
+                  const SizedBox(height: 10),
+                  if (tieneCoordenadas) ...[
                     Text(
-                      'Calle Mayor 42, 3º B, Madrid',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: AppColors.azulOscuro),
+                      'Coordenadas: $latStr, $lngStr',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.azulOscuro),
                     ),
-                    Text(
-                      'Última actualización: hace 30 seg',
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Transmitido en vivo por el teléfono del paciente',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Sin señal GPS del paciente al emitir la alerta',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.azulOscuro),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Comunícate por llamada telefónica de inmediato',
+                      textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5E5482),
-                foregroundColor: Colors.white,
+            if (tieneCoordenadas && urlMaps != null) ...[
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF336C60),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                icon: const Icon(Icons.map_rounded, size: 20),
+                label: const Text('Abrir en Google Maps', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: () {
+                  AlarmasNativasService.abrirEnlace(urlMaps);
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF5E5482),
+                side: const BorderSide(color: Color(0xFF5E5482)),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),

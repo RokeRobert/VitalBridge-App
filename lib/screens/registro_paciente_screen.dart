@@ -26,6 +26,42 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
   int _tipoPacienteSeleccionado = 1; // 1: Adulto Mayor, 2: Crónico, 3: General
   bool _guardando = false;
   XFile? _fotoArchivo;
+  int _cantidadPacientesPrevios = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarConteoPacientes();
+  }
+
+  Future<void> _cargarConteoPacientes() async {
+    final cantidad = await PacientesService.contarPacientes();
+    if (mounted) {
+      setState(() => _cantidadPacientesPrevios = cantidad);
+    }
+  }
+
+  void _limpiarFormularioParaSiguientePaciente(String nombreAnterior) {
+    _nombreCtrl.clear();
+    _apellidosCtrl.clear();
+    _telefonoCtrl.clear();
+    setState(() {
+      _fotoArchivo = null;
+      _parentescoSeleccionado = 'Padre / Madre';
+      _tipoPacienteSeleccionado = 1;
+      _cantidadPacientesPrevios++;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.turquesa,
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          '¡$nombreAnterior registrado! Ahora puedes ingresar los datos del siguiente paciente.',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
 
   Future<void> _seleccionarFoto() async {
     final foto = await PerfilesService.seleccionarFotoDeGaleria();
@@ -268,6 +304,31 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+
+              // Botón para registrar inmediatamente a otro paciente adicional
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.moradoOscuro,
+                    side: const BorderSide(color: AppColors.moradoOscuro, width: 1.5),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(context); // Cierra el modal de QR
+                    _limpiarFormularioParaSiguientePaciente(paciente.nombre);
+                  },
+                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 20),
+                  label: const Text(
+                    '+ Registrar a otro paciente',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -340,8 +401,14 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'Al guardar se generará un código QR único para que el paciente entre sin contraseñas.',
-                            style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
+                            _cantidadPacientesPrevios > 0
+                                ? 'Tienes $_cantidadPacientesPrevios ${_cantidadPacientesPrevios == 1 ? "paciente vinculado" : "pacientes vinculados"}. Puedes agregar más a tu cargo.'
+                                : 'Al guardar se generará un código QR único para que el paciente entre sin contraseñas.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: _cantidadPacientesPrevios > 0 ? AppColors.moradoOscuro : Colors.grey[600],
+                              fontWeight: _cantidadPacientesPrevios > 0 ? FontWeight.w600 : FontWeight.normal,
+                            ),
                           ),
                         ],
                       ),

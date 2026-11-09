@@ -224,13 +224,17 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
 
     if (!mounted) return;
 
+    final idGuardado = await PacientesService.obtenerIdPacienteSeleccionado();
+    PacienteModel? preseleccionado;
+    if (idGuardado != null) {
+      try {
+        preseleccionado = lista.firstWhere((p) => p.id == idGuardado);
+      } catch (_) {}
+    }
+
     setState(() {
       _pacientes = lista;
-      if (_pacientes.isNotEmpty) {
-        _pacienteSeleccionado = _pacientes.first;
-      } else {
-        _pacienteSeleccionado = null;
-      }
+      _pacienteSeleccionado = preseleccionado ?? (lista.isNotEmpty ? lista.first : null);
       _cargando = false;
     });
 
@@ -852,8 +856,33 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
             _construirEncabezado(),
             const SizedBox(height: 16),
 
-            // Selector de Paciente (si tiene más de 1 paciente)
-            if (_pacientes.length > 1) ...[
+            // Selector de Paciente con opción de registrar más pacientes
+            if (_pacientes.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.people_alt_rounded, size: 16, color: AppColors.moradoOscuro),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Pacientes a tu cargo (${_pacientes.length})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.azulOscuro,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_pacientes.length > 1)
+                    Text(
+                      'Toca para cambiar de paciente',
+                      style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
               SizedBox(
                 height: 42,
                 child: ListView.separated(
@@ -865,9 +894,9 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                       return OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.moradoOscuro,
-                          side: const BorderSide(color: AppColors.lilaSuave),
+                          side: const BorderSide(color: AppColors.moradoOscuro, width: 1.2),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                         ),
                         onPressed: () async {
                           final nuevo = await Navigator.push(
@@ -878,8 +907,8 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                           );
                           if (nuevo != null) _cargarPacientes();
                         },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Nuevo', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
+                        icon: const Icon(Icons.person_add_alt_1_rounded, size: 16),
+                        label: const Text('+ Agregar Paciente', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold)),
                       );
                     }
 
@@ -897,7 +926,18 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                                   ? NetworkImage(p.foto!)
                                   : FileImage(File(p.foto!)) as ImageProvider,
                             )
-                          : null,
+                          : CircleAvatar(
+                              radius: 12,
+                              backgroundColor: esActivo ? Colors.white24 : AppColors.moradoOscuro.withValues(alpha: 0.15),
+                              child: Text(
+                                p.nombre.isNotEmpty ? p.nombre[0].toUpperCase() : 'P',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: esActivo ? Colors.white : AppColors.moradoOscuro,
+                                ),
+                              ),
+                            ),
                       label: Text(p.nombre),
                       labelStyle: TextStyle(
                         fontSize: 13,
@@ -914,6 +954,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                       ),
                       onSelected: (_) {
                         setState(() => _pacienteSeleccionado = p);
+                        PacientesService.guardarIdPacienteSeleccionado(p.id);
                         _cargarTomasHoy();
                       },
                     );

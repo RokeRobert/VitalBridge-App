@@ -223,9 +223,23 @@ class AlarmasNativasService {
     required String indicaciones,
   }) {
     if (alarmaAbierta) return;
-    alarmaAbierta = true;
 
-    navigatorKey.currentState?.push(
+    final navState = navigatorKey.currentState;
+    if (navState == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _abrirPantallaAlarma(
+          idHorario: idHorario,
+          nombreMedicamento: nombreMedicamento,
+          dosis: dosis,
+          hora: hora,
+          indicaciones: indicaciones,
+        );
+      });
+      return;
+    }
+
+    alarmaAbierta = true;
+    navState.push(
       MaterialPageRoute(
         builder: (context) => AlarmaMedicamentoScreen(
           idHorario: idHorario,

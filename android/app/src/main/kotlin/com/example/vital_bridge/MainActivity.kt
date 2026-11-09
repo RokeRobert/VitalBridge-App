@@ -25,25 +25,27 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        configurarPantallaBloqueo()
         val payload = extraerPayloadDeIntent(intent)
         if (!payload.isNullOrEmpty()) {
             ultimoPayload = payload
+            configurarPantallaBloqueo()
         }
     }
 
     override fun onResume() {
         super.onResume()
-        configurarPantallaBloqueo()
+        if (!ultimoPayload.isNullOrEmpty()) {
+            configurarPantallaBloqueo()
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        configurarPantallaBloqueo()
         val payload = extraerPayloadDeIntent(intent)
         if (!payload.isNullOrEmpty()) {
             ultimoPayload = payload
+            configurarPantallaBloqueo()
         }
         procesarIntentAlarma(intent)
     }

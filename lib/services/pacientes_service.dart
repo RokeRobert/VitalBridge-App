@@ -17,6 +17,44 @@ class PacientesService {
     _pacientesEnMemoria.clear();
   }
 
+  /// Clave de almacenamiento para persistir el paciente activo seleccionado
+  static String _keyPacienteSeleccionado(String usuarioId) => 'paciente_activo_id_$usuarioId';
+
+  /// Obtiene el ID del paciente actualmente seleccionado por el cuidador
+  static Future<String?> obtenerIdPacienteSeleccionado() async {
+    final prefs = await SharedPreferences.getInstance();
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
+    if (usuarioId.isEmpty) return null;
+    return prefs.getString(_keyPacienteSeleccionado(usuarioId));
+  }
+
+  /// Guarda el ID del paciente seleccionado para recordarlo entre pantallas y reinicios
+  static Future<void> guardarIdPacienteSeleccionado(String idPaciente) async {
+    final prefs = await SharedPreferences.getInstance();
+    final usuarioId = prefs.getString('auth_user_id') ?? '';
+    if (usuarioId.isNotEmpty) {
+      await prefs.setString(_keyPacienteSeleccionado(usuarioId), idPaciente);
+    }
+  }
+
+  /// Obtiene un paciente específico por su ID desde la lista en memoria o caché
+  static Future<PacienteModel?> obtenerPacientePorId(String idPaciente) async {
+    if (_pacientesEnMemoria.isEmpty) {
+      await obtenerPacientes();
+    }
+    try {
+      return _pacientesEnMemoria.firstWhere((p) => p.id == idPaciente);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Cuenta cuántos pacientes tiene actualmente asignados el cuidador
+  static Future<int> contarPacientes() async {
+    final lista = await obtenerPacientes();
+    return lista.length;
+  }
+
   /// Obtiene los pacientes vinculados al cuidador activo
   static Future<List<PacienteModel>> obtenerPacientes() async {
     final prefs = await SharedPreferences.getInstance();
@@ -98,6 +136,11 @@ class PacientesService {
 
     final cacheKey = 'cache_pacientes_json_$usuarioId';
 
+    // Asegurar que la lista en memoria contenga todos los pacientes previos antes de registrar uno nuevo
+    if (_pacientesEnMemoria.isEmpty) {
+      await obtenerPacientes();
+    }
+
     // Generar un código de token seguro de alta entropía (ej: VB-7K9M-4X2P)
     const alfabeto = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
     final random = Random.secure();
@@ -131,11 +174,13 @@ class PacientesService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
         final nuevoPaciente = PacienteModel.fromJson(data['paciente'] ?? data);
+        _pacientesEnMemoria.removeWhere((p) => p.id == nuevoPaciente.id);
         _pacientesEnMemoria.add(nuevoPaciente);
         await prefs.setString(
           cacheKey,
           jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
         );
+        await guardarIdPacienteSeleccionado(nuevoPaciente.id);
 
         return {
           'exito': true,
@@ -163,7 +208,13 @@ class PacientesService {
       fechaRegistro: DateTime.now(),
     );
 
+    _pacientesEnMemoria.removeWhere((p) => p.id == nuevoPacienteLocal.id);
     _pacientesEnMemoria.add(nuevoPacienteLocal);
+    await prefs.setString(
+      cacheKey,
+      jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
+    );
+    await guardarIdPacienteSeleccionado(nuevoPacienteLocal.id);
 
     return {
       'exito': true,

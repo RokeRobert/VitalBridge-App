@@ -7,10 +7,20 @@ import 'package:vital_bridge/services/api_constants.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 
 class TratamientosService {
-  // Constantes de persistencia local offline
-  static const String _keyCacheTratamientos = 'cache_tratamientos_json';
-  static const String _keyCacheTomasHoy = 'cache_tomas_hoy_json';
+  // Constantes y helpers de persistencia local offline por paciente
+  static const String _prefijoCacheTratamientos = 'cache_tratamientos_json';
+  static const String _prefijoCacheTomasHoy = 'cache_tomas_hoy_json';
   static const String _keyColaTomasPendientes = 'cola_tomas_pendientes_json';
+
+  static String _keyCacheTratamientos(String? pacienteId) =>
+      (pacienteId != null && pacienteId.isNotEmpty)
+          ? '${_prefijoCacheTratamientos}_$pacienteId'
+          : _prefijoCacheTratamientos;
+
+  static String _keyCacheTomasHoy(String? pacienteId) =>
+      (pacienteId != null && pacienteId.isNotEmpty)
+          ? '${_prefijoCacheTomasHoy}_$pacienteId'
+          : _prefijoCacheTomasHoy;
 
   // Lista en memoria para modo desarrollo / simulación sin backend encendido
   static final List<TratamientoModel> _tratamientosSimulados = [
@@ -160,8 +170,10 @@ class TratamientosService {
   /// Obtiene los tratamientos registrados para el paciente consultando la API en C#
   static Future<List<TratamientoModel>> obtenerTratamientos({String? pacienteId}) async {
     final prefs = await SharedPreferences.getInstance();
+    pacienteId ??= await AuthService.obtenerUsuarioId();
+    final cacheKey = _keyCacheTratamientos(pacienteId);
+
     try {
-      pacienteId ??= await AuthService.obtenerUsuarioId();
       final headers = await _obtenerHeaders();
 
       final uri = (pacienteId != null && pacienteId.isNotEmpty)
@@ -174,10 +186,16 @@ class TratamientosService {
         final List data = jsonDecode(response.body);
         final lista = data.map((item) => TratamientoModel.fromJson(item)).toList();
 
-        // Actualizar respaldo en memoria y caché local
-        _tratamientosSimulados.clear();
+        // Actualizar respaldo en memoria por paciente y caché local aislada
+        if (pacienteId != null && pacienteId.isNotEmpty) {
+          _tratamientosSimulados.removeWhere(
+            (t) => t.idPaciente == pacienteId || t.idPaciente == null || t.idPaciente!.isEmpty,
+          );
+        } else {
+          _tratamientosSimulados.clear();
+        }
         _tratamientosSimulados.addAll(lista);
-        await prefs.setString(_keyCacheTratamientos, jsonEncode(data));
+        await prefs.setString(cacheKey, jsonEncode(data));
 
         return lista;
       }
@@ -186,23 +204,17 @@ class TratamientosService {
       print('Error al consultar tratamientos en la API: $e');
     }
 
-    // Respaldo de persistencia local en caché si la API no está disponible
-    final cacheJson = prefs.getString(_keyCacheTratamientos);
+    // Respaldo de persistencia local en caché aislada por paciente
+    final cacheJson = prefs.getString(cacheKey);
     if (cacheJson != null && cacheJson.isNotEmpty) {
       try {
         final List decoded = jsonDecode(cacheJson);
-        final enCache = decoded.map((item) => TratamientoModel.fromJson(item)).toList();
-        if (pacienteId != null && pacienteId.isNotEmpty) {
-          final filtrados = enCache.where((t) => t.idPaciente == pacienteId).toList();
-          if (filtrados.isNotEmpty) return filtrados;
-        }
-        return enCache;
+        return decoded.map((item) => TratamientoModel.fromJson(item)).toList();
       } catch (_) {}
     }
 
     if (pacienteId != null && pacienteId.isNotEmpty) {
-      final filtrados = _tratamientosSimulados.where((t) => t.idPaciente == pacienteId).toList();
-      if (filtrados.isNotEmpty) return filtrados;
+      return _tratamientosSimulados.where((t) => t.idPaciente == pacienteId).toList();
     }
 
     return List.from(_tratamientosSimulados);
@@ -338,12 +350,13 @@ class TratamientosService {
   /// Obtiene la lista de tomas programadas para hoy para un paciente específico (con soporte Offline-First)
   static Future<List<TomaModel>> obtenerTomasHoy({String? pacienteId}) async {
     final prefs = await SharedPreferences.getInstance();
+    pacienteId ??= await AuthService.obtenerUsuarioId();
+    final cacheKey = _keyCacheTomasHoy(pacienteId);
 
     // Intentar sincronizar tomas pendientes que se hayan marcado offline
     sincronizarTomasPendientes();
 
     try {
-      pacienteId ??= await AuthService.obtenerUsuarioId();
       final headers = await _obtenerHeaders();
 
       final uri = (pacienteId != null && pacienteId.isNotEmpty)
@@ -356,8 +369,8 @@ class TratamientosService {
         final List data = jsonDecode(response.body);
         final tomasDesdeApi = data.map((item) => TomaModel.fromJson(item)).toList();
 
-        // Guardar copia exacta en disco local para modo offline
-        await prefs.setString(_keyCacheTomasHoy, jsonEncode(data));
+        // Guardar copia exacta en disco local aislada por paciente para modo offline
+        await prefs.setString(cacheKey, jsonEncode(data));
         return tomasDesdeApi;
       }
     } catch (e) {
@@ -365,8 +378,8 @@ class TratamientosService {
       print('Aviso: modo offline para tomas: $e');
     }
 
-    // 1. Respaldo de persistencia local en caché (datos de la última sincronización)
-    final cacheTomasJson = prefs.getString(_keyCacheTomasHoy);
+    // 1. Respaldo de persistencia local en caché aislada por paciente
+    final cacheTomasJson = prefs.getString(cacheKey);
     if (cacheTomasJson != null && cacheTomasJson.isNotEmpty) {
       try {
         final List decoded = jsonDecode(cacheTomasJson);
@@ -392,7 +405,7 @@ class TratamientosService {
       } catch (_) {}
     }
 
-    // 2. Respaldo secundario: Reconstruir a partir de tratamientos en caché
+    // 2. Respaldo secundario: Reconstruir a partir de tratamientos en caché del paciente
     final tratamientos = await obtenerTratamientos(pacienteId: pacienteId);
     if (tratamientos.isNotEmpty) {
       final List<TomaModel> tomasPaciente = [];
@@ -427,6 +440,10 @@ class TratamientosService {
       return tomasPaciente;
     }
 
+    if (pacienteId != null && pacienteId.isNotEmpty) {
+      return [];
+    }
+
     return List.from(_tomasHoySimuladas);
   }
 
@@ -456,18 +473,24 @@ class TratamientosService {
     pendientes.add(body);
     await prefs.setString(_keyColaTomasPendientes, jsonEncode(pendientes));
 
-    // 2. Actualizar también la caché de tomas locales en disco
-    final cacheTomasJson = prefs.getString(_keyCacheTomasHoy);
-    if (cacheTomasJson != null && cacheTomasJson.isNotEmpty) {
+    // 2. Actualizar también la caché de tomas locales en disco (por paciente y legado)
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith(_prefijoCacheTomasHoy)) continue;
+      final cacheTomasJson = prefs.getString(key);
+      if (cacheTomasJson == null || cacheTomasJson.isEmpty) continue;
       try {
         final List decoded = jsonDecode(cacheTomasJson);
+        bool modificado = false;
         for (var item in decoded) {
           if (item['idHorario'] == idHorario) {
             item['estado'] = 'Tomada';
             item['horaTomada'] = ahoraUtc.toIso8601String();
+            modificado = true;
           }
         }
-        await prefs.setString(_keyCacheTomasHoy, jsonEncode(decoded));
+        if (modificado) {
+          await prefs.setString(key, jsonEncode(decoded));
+        }
       } catch (_) {}
     }
 

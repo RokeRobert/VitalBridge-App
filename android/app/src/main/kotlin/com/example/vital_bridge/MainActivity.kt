@@ -297,6 +297,7 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "cerrarPantallaAlarma" -> {
+                    ultimoPayload = null
                     try {
                         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
                         notificationManager?.cancel(9999)

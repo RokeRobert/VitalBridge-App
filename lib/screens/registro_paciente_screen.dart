@@ -27,6 +27,7 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
   bool _guardando = false;
   XFile? _fotoArchivo;
   int _cantidadPacientesPrevios = 0;
+  bool _seRegistroAlgunPaciente = false;
 
   @override
   void initState() {
@@ -107,6 +108,7 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
       setState(() => _guardando = false);
 
       if (resultado['exito'] == true) {
+        _seRegistroAlgunPaciente = true;
         PacienteModel paciente = resultado['paciente'];
         final String token = resultado['token'] ?? paciente.token ?? 'VB-1000';
 
@@ -338,7 +340,13 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.pop(context, _seRegistroAlgunPaciente ? true : null);
+      },
+      child: Scaffold(
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text(
@@ -354,7 +362,7 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.azulOscuro, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => Navigator.pop(context, _seRegistroAlgunPaciente ? true : null),
         ),
       ),
       body: SingleChildScrollView(
@@ -624,6 +632,7 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

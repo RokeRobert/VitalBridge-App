@@ -65,7 +65,7 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
   @override
   void didUpdateWidget(covariant TratamientosScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.pacienteId != widget.pacienteId) {
+    if (oldWidget.pacienteId != widget.pacienteId || oldWidget.nombrePaciente != widget.nombrePaciente) {
       _pacienteIdActual = widget.pacienteId;
       _nombrePacienteActual = widget.nombrePaciente;
       _cargarTratamientos();
@@ -76,13 +76,24 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
     setState(() => _cargando = true);
 
     try {
-      // Si no se proporcionó pacienteId, obtener el primer paciente activo del cuidador
-      if (_pacienteIdActual == null || _pacienteIdActual!.isEmpty) {
+      // Si no se proporcionó pacienteId en modo cuidador, usar el seleccionado o el primero activo
+      if (widget.esModoCuidador && (_pacienteIdActual == null || _pacienteIdActual!.isEmpty)) {
         final pacientes = await PacientesService.obtenerPacientes();
-        if (pacientes.isNotEmpty) {
-          _pacienteIdActual = pacientes.first.id;
-          _nombrePacienteActual = pacientes.first.nombre;
+        if (pacientes.isEmpty) {
+          if (mounted) {
+            setState(() {
+              _tratamientos = [];
+              _cargando = false;
+            });
+          }
+          return;
         }
+        final idGuardado = await PacientesService.obtenerIdPacienteSeleccionado();
+        final elegido = idGuardado != null
+            ? pacientes.firstWhere((p) => p.id == idGuardado, orElse: () => pacientes.first)
+            : pacientes.first;
+        _pacienteIdActual = elegido.id;
+        _nombrePacienteActual = elegido.nombre;
       }
 
       final lista = await TratamientosService.obtenerTratamientos(
@@ -314,6 +325,15 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
               icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.moradoOscuro, size: 26),
               tooltip: 'Nuevo Medicamento',
               onPressed: () async {
+                if (_pacienteIdActual == null || _pacienteIdActual!.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Primero registra un paciente desde el panel de Monitoreo.'),
+                      backgroundColor: AppColors.terracota,
+                    ),
+                  );
+                  return;
+                }
                 final agregado = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(
                     builder: (context) => AgregarMedicamentoScreen(
@@ -339,6 +359,34 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (widget.esModoCuidador &&
+                    _nombrePacienteActual != null &&
+                    _nombrePacienteActual!.isNotEmpty)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.lilaSuave.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.lilaSuave.withValues(alpha: 0.45)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.person_rounded, size: 18, color: AppColors.moradoOscuro),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Paciente: $_nombrePacienteActual',
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.azulOscuro,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (!widget.esModoCuidador)
                   Container(
                     margin: const EdgeInsets.only(bottom: 16),

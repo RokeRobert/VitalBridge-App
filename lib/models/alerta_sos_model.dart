@@ -27,17 +27,16 @@ class AlertaSosModel {
     if (val == null) return DateTime.now();
     var s = val.toString().trim();
     if (s.isEmpty) return DateTime.now();
-    if (!s.endsWith('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
-      s += 'Z';
-    }
-    return DateTime.tryParse(s)?.toLocal() ?? DateTime.now();
+    final parsed = DateTime.tryParse(s);
+    return parsed?.toLocal() ?? DateTime.now();
   }
 
   String get horaLegible {
     final local = fechaCreacion.toLocal();
-    final hora = local.hour.toString().padLeft(2, '0');
+    final hora = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
     final min = local.minute.toString().padLeft(2, '0');
-    return '$hora:$min';
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hora:$min $ampm';
   }
 
   /// Genera un enlace directo a Google Maps con las coordenadas del paciente
@@ -71,7 +70,7 @@ class AlertaSosModel {
       if (id > 0) 'idAlerta': id,
       'idPaciente': idPaciente,
       if (nombrePaciente != null) 'nombrePaciente': nombrePaciente,
-      'fechaCreacion': fechaCreacion.toIso8601String(),
+      'fechaCreacion': fechaCreacion.toUtc().toIso8601String(),
       'idEstadoAlerta': idEstadoAlerta,
       'estado': estado,
       if (latitud != null) 'latitud': latitud,

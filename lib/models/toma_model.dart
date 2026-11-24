@@ -31,20 +31,18 @@ class TomaModel {
     if (val == null) return null;
     var s = val.toString().trim();
     if (s.isEmpty) return null;
-    // Si no contiene indicador de zona horaria (Z o +/-), se asume UTC
-    if (!s.endsWith('Z') && !s.contains('+') && !RegExp(r'-\d{2}:\d{2}$').hasMatch(s)) {
-      s += 'Z';
-    }
-    return DateTime.tryParse(s)?.toLocal();
+    final parsed = DateTime.tryParse(s);
+    return parsed?.toLocal();
   }
 
-  /// Hora confirmada legible en hora local
+  /// Hora confirmada legible en hora local (formato 12 horas AM/PM)
   String? get horaConfirmadaLegible {
     if (horaTomada == null) return null;
     final local = horaTomada!.toLocal();
-    final hora = local.hour.toString().padLeft(2, '0');
+    final hora = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
     final min = local.minute.toString().padLeft(2, '0');
-    return '$hora:$min';
+    final ampm = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hora:$min $ampm';
   }
 
   TomaModel copyWith({
@@ -92,7 +90,7 @@ class TomaModel {
       'medicamento': medicamento,
       'dosis': dosis,
       'horaProgramada': horaProgramada,
-      if (horaTomada != null) 'horaTomada': horaTomada!.toIso8601String(),
+      if (horaTomada != null) 'horaTomada': horaTomada!.toUtc().toIso8601String(),
       'estado': estado,
       if (observaciones != null) 'observaciones': observaciones,
       if (indicaciones != null) 'indicaciones': indicaciones,

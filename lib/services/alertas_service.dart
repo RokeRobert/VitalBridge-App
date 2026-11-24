@@ -302,7 +302,7 @@ class AlertasService {
         id: idAlerta,
         idPaciente: idPaciente ?? '',
         nombrePaciente: nombrePaciente ?? 'Paciente',
-        fechaCreacion: DateTime.now(),
+        fechaCreacion: DateTime.now().toUtc(),
         idEstadoAlerta: 2,
         estado: resolucion,
         latitud: latitud,

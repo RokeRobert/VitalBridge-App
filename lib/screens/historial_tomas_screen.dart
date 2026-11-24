@@ -985,8 +985,11 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
 
   Widget _construirTarjetaAlertaAtendida(AlertaSosModel alerta) {
     final localTime = alerta.fechaCreacion.toLocal();
+    final hora12 = localTime.hour == 0 ? 12 : (localTime.hour > 12 ? localTime.hour - 12 : localTime.hour);
+    final min = localTime.minute.toString().padLeft(2, '0');
+    final ampm = localTime.hour >= 12 ? 'PM' : 'AM';
     final fechaLegible =
-        '${localTime.day}/${localTime.month}/${localTime.year} a las ${localTime.hour.toString().padLeft(2, '0')}:${localTime.minute.toString().padLeft(2, '0')}';
+        '${localTime.day}/${localTime.month}/${localTime.year} a las $hora12:$min $ampm';
     final bool tieneGps = alerta.latitud != null && alerta.longitud != null;
 
     return Container(

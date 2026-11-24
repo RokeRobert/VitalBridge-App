@@ -358,10 +358,13 @@ class TratamientosService {
 
     try {
       final headers = await _obtenerHeaders();
+      final ahora = DateTime.now();
+      final fechaStr =
+          '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}-${ahora.day.toString().padLeft(2, '0')}';
 
       final uri = (pacienteId != null && pacienteId.isNotEmpty)
-          ? Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId')
-          : Uri.parse(ApiConstants.tomasHoy);
+          ? Uri.parse('${ApiConstants.tomasHoy}?pacienteId=$pacienteId&fecha=$fechaStr')
+          : Uri.parse('${ApiConstants.tomasHoy}?fecha=$fechaStr');
 
       final response = await http.get(uri, headers: headers).timeout(const Duration(seconds: 6));
 

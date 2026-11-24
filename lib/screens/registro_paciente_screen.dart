@@ -365,9 +365,16 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
           onPressed: () => Navigator.pop(context, _seRegistroAlgunPaciente ? true : null),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Form(
+      body: SafeArea(
+        bottom: true,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: 32 + MediaQuery.paddingOf(context).bottom,
+          ),
+          child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -631,6 +638,7 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
             ],
           ),
         ),
+      ),
       ),
     ),
     );

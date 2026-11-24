@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/screens/agregar_medicamento_screen.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
@@ -163,11 +163,12 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
             ),
             onPressed: () async {
               Navigator.pop(context);
+              final messenger = ScaffoldMessenger.of(context);
               final exito = await TratamientosService.eliminarTratamiento(item.id);
               if (exito) {
                 await _cargarTratamientos();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('🗑️ $nombre ha sido finalizado del tratamiento.'),
                       backgroundColor: AppColors.azulOscuro,
@@ -265,6 +266,7 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
             ),
             onPressed: () async {
               Navigator.pop(context);
+              final messenger = ScaffoldMessenger.of(context);
               final actualizado = item.copyWith(
                 cantidad: double.tryParse(dosisCtrl.text.trim()) ?? item.cantidad,
                 indicaciones: indicacionesCtrl.text.trim(),
@@ -274,7 +276,7 @@ class _TratamientosScreenState extends State<TratamientosScreen> {
               if (res['exito'] == true) {
                 await _cargarTratamientos();
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messenger.showSnackBar(
                     SnackBar(
                       content: Text('✅ Indicaciones de ${item.medicamento} actualizadas.'),
                       backgroundColor: const Color(0xFF336C60),

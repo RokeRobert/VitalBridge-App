@@ -179,7 +179,7 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
             ],
           ),
           content: Text(
-            'El paciente ' + (masReciente.nombrePaciente ?? 'asignado') + ' ha presionado el botón de auxilio SOS.\n\nSe requiere tu atención de inmediato.',
+            'El paciente ${masReciente.nombrePaciente ?? 'asignado'} ha presionado el botón de auxilio SOS.\n\nSe requiere tu atención de inmediato.',
             style: const TextStyle(fontSize: 15, color: Color(0xFF1E293B)),
           ),
           actions: [
@@ -1714,36 +1714,39 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
       child: Scaffold(
         backgroundColor: AppColors.fondo,
         body: cuerpo,
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _tabSeleccionado,
-          onTap: (index) {
-            setState(() => _tabSeleccionado = index);
-            if (index == 0) {
-              _cargarTomasHoy();
-            }
-          },
-          selectedItemColor: AppColors.moradoOscuro,
-          unselectedItemColor: Colors.grey[500],
-          backgroundColor: Colors.white,
-          type: BottomNavigationBarType.fixed,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dashboard_rounded),
-              label: 'Monitoreo',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.medication_rounded),
-              label: 'Tratamientos',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history_rounded),
-              label: 'Historial',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: 'Perfil',
-            ),
-          ],
+        bottomNavigationBar: SafeArea(
+          bottom: true,
+          child: BottomNavigationBar(
+            currentIndex: _tabSeleccionado,
+            onTap: (index) {
+              setState(() => _tabSeleccionado = index);
+              if (index == 0) {
+                _cargarTomasHoy();
+              }
+            },
+            selectedItemColor: AppColors.moradoOscuro,
+            unselectedItemColor: Colors.grey[500],
+            backgroundColor: Colors.white,
+            type: BottomNavigationBarType.fixed,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.dashboard_rounded),
+                label: 'Monitoreo',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.medication_rounded),
+                label: 'Tratamientos',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.history_rounded),
+                label: 'Historial',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person_rounded),
+                label: 'Perfil',
+              ),
+            ],
+          ),
         ),
       ),
     );

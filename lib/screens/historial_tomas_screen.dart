@@ -32,7 +32,8 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
   // Estado de Pacientes
   List<PacienteModel> _pacientes = [];
   PacienteModel? _pacienteSeleccionado;
-  bool _cargandoPacientes = true;
+  // ignore: unused_field — reservado para indicador de carga futura
+  bool _cargandoPacientes = false;
 
   // Estado de Fechas (ordenadas del más nuevo al más viejo)
   List<DateTime> _diasHistorial = [];
@@ -213,6 +214,14 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
     }
   }
 
+  String _mesAbreviado(DateTime fecha) {
+    const meses = [
+      'ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN',
+      'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'
+    ];
+    return meses[fecha.month - 1];
+  }
+
   String _etiquetaFecha(DateTime fecha) {
     final ahora = DateTime.now();
     final hoy = DateTime(ahora.year, ahora.month, ahora.day);
@@ -312,22 +321,25 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
           ),
         ),
       ),
-      body: Column(
-        children: [
-          // Selector de Paciente (apoyo multi-paciente)
-          if (_pacientes.isNotEmpty) _construirSelectorPaciente(),
+      body: SafeArea(
+        bottom: true,
+        child: Column(
+          children: [
+            // Selector de Paciente (apoyo multi-paciente)
+            if (_pacientes.isNotEmpty) _construirSelectorPaciente(),
 
-          // Contenido de las pestañas
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _construirPestanaCumplimientoCronologico(),
-                _construirPestanaAlertasAtendidas(),
-              ],
+            // Contenido de las pestañas
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _construirPestanaCumplimientoCronologico(),
+                  _construirPestanaAlertasAtendidas(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -412,7 +424,12 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 14,
+          bottom: 32 + MediaQuery.paddingOf(context).bottom,
+        ),
         itemCount: _diasHistorial.length + 1, // +1 para el botón de calendario al final
         itemBuilder: (context, index) {
           // Último elemento: botón para buscar fechas más antiguas en el calendario
@@ -496,8 +513,8 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
                   children: [
                     // Icono de calendario con el día
                     Container(
-                      width: 44,
-                      height: 44,
+                      width: 46,
+                      height: 46,
                       decoration: BoxDecoration(
                         color: estaSeleccionada
                             ? AppColors.moradoOscuro
@@ -512,15 +529,17 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              height: 1.1,
                               color: estaSeleccionada ? Colors.white : AppColors.moradoOscuro,
                             ),
                           ),
                           Text(
-                            etiqueta,
+                            _mesAbreviado(fecha),
                             style: TextStyle(
                               fontSize: 9.5,
-                              fontWeight: FontWeight.w600,
-                              color: estaSeleccionada ? Colors.white70 : AppColors.azulOscuro,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              color: estaSeleccionada ? Colors.white.withValues(alpha: 0.85) : AppColors.azulOscuro,
                             ),
                           ),
                         ],
@@ -533,15 +552,39 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            fechaCompleta,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.azulOscuro,
-                            ),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  fechaCompleta,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.azulOscuro,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: estaSeleccionada
+                                      ? AppColors.turquesa.withValues(alpha: 0.25)
+                                      : AppColors.lilaSuave.withValues(alpha: 0.25),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  etiqueta,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: estaSeleccionada ? const Color(0xFF1E3F38) : AppColors.moradoOscuro,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -849,7 +892,12 @@ class _HistorialTomasScreenState extends State<HistorialTomasScreen>
       },
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 16,
+          bottom: 32 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

@@ -142,7 +142,35 @@ class AlertasService {
     final prefs = await SharedPreferences.getInstance();
     List<AlertaSosModel> resultado = [];
 
-    // 1. Obtener desde almacenamiento local persistente
+    // 1. Intentar consultar el endpoint real del backend
+    try {
+      final headers = await _obtenerHeaders();
+      String url = ApiConstants.alertasHistorial;
+      if (pacienteId != null && pacienteId.isNotEmpty) {
+        url += '?idPaciente=$pacienteId';
+      }
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final listaRemota = data.map((item) => AlertaSosModel.fromJson(item)).toList();
+        if (listaRemota.isNotEmpty) {
+          try {
+            await prefs.setString(
+              _keyHistorialAlertasAtendidas,
+              jsonEncode(listaRemota.map((a) => a.toJson()).toList()),
+            );
+          } catch (_) {}
+          return listaRemota;
+        }
+      }
+    } catch (_) {
+      // Si falla la red o está desconectado, recurrir a almacenamiento local
+    }
+
+    // 2. Obtener desde almacenamiento local persistente
     final guardadasJson = prefs.getString(_keyHistorialAlertasAtendidas);
     if (guardadasJson != null && guardadasJson.isNotEmpty) {
       try {

@@ -331,8 +331,14 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
         ),
       ),
       body: SafeArea(
+        bottom: true,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 20.0),
+          padding: EdgeInsets.only(
+            left: 22.0,
+            right: 22.0,
+            top: 20.0,
+            bottom: 32.0 + MediaQuery.paddingOf(context).bottom,
+          ),
           child: Form(
             key: _formKey,
             child: Column(

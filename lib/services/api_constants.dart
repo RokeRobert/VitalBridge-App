@@ -48,6 +48,7 @@ class ApiConstants {
   // --- Endpoints de Emergencias y Alertas SOS (/api/alertas) ---
   static String get emitirAlertaSOS => '$baseUrl/alertas/sos';
   static String get alertasActivas => '$baseUrl/alertas/activas';
+  static String get alertasHistorial => '$baseUrl/alertas/historial';
   static String get resolverAlerta => '$baseUrl/alertas/resolver';
   static String get registrarFcmToken => '$baseUrl/alertas/fcm-token';
 

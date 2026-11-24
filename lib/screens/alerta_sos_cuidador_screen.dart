@@ -163,8 +163,8 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
 
   void _verUbicacion() {
     final tieneCoordenadas = widget.latitud != null && widget.longitud != null;
-    final latStr = widget.latitud != null ? widget.latitud!.toStringAsFixed(6) : null;
-    final lngStr = widget.longitud != null ? widget.longitud!.toStringAsFixed(6) : null;
+    final latStr = widget.latitud?.toStringAsFixed(6);
+    final lngStr = widget.longitud?.toStringAsFixed(6);
     final urlMaps = tieneCoordenadas
         ? 'https://www.google.com/maps/search/?api=1&query=${widget.latitud},${widget.longitud}'
         : null;
@@ -445,8 +445,14 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFFFAFBFD),
         body: SafeArea(
+          bottom: true,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+            padding: EdgeInsets.only(
+              left: 20.0,
+              right: 20.0,
+              top: 12.0,
+              bottom: 32.0 + MediaQuery.paddingOf(context).bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [

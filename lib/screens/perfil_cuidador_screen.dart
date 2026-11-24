@@ -328,7 +328,10 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
+      body: SafeArea(
+        bottom: true,
+        top: false,
+        child: SingleChildScrollView(
         child: Column(
           children: [
             // Cabecera curva en gradiente menta suave
@@ -1023,12 +1026,13 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                       onTap: _confirmarCerrarSesion,
                     ),
                   ),
-                  const SizedBox(height: 30),
+                  SizedBox(height: 32 + MediaQuery.paddingOf(context).bottom),
                 ],
               ),
             ),
           ],
         ),
+      ),
       ),
     );
   }

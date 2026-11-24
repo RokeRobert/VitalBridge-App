@@ -688,12 +688,18 @@ class _PacienteScreenState extends State<PacienteScreen> with WidgetsBindingObse
       child: Scaffold(
         backgroundColor: const Color(0xFFFAF7F2), // Fondo suave crema
         body: SafeArea(
+          bottom: true,
           child: RefreshIndicator(
             onRefresh: _cargarTomasHoy,
             color: const Color(0xFF453E60),
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding: EdgeInsets.only(
+                left: 24.0,
+                right: 24.0,
+                top: 16.0,
+                bottom: 32.0 + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [

@@ -156,6 +156,7 @@ class FcmService {
     AlarmasNativasService.cancelarNotificacionSos();
 
     final idAlerta = int.tryParse(data['idAlerta']?.toString() ?? '0');
+    final idPaciente = data['idPaciente']?.toString() ?? '';
     final latitud = double.tryParse(data['latitud']?.toString() ?? '');
     final longitud = double.tryParse(data['longitud']?.toString() ?? '');
     final nombrePaciente = data['nombrePaciente']?.toString() ?? 'Paciente';
@@ -164,6 +165,7 @@ class FcmService {
       MaterialPageRoute(
         builder: (_) => AlertaSosCuidadorScreen(
           nombrePaciente: nombrePaciente,
+          idPaciente: idPaciente,
           idAlerta: idAlerta,
           latitud: latitud,
           longitud: longitud,

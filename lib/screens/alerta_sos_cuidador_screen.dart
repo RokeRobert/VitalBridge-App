@@ -102,7 +102,14 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
     await AlarmasNativasService.cancelarNotificacionSos();
 
     if (resolver && widget.idAlerta != null) {
-      AlertasService.resolverAlerta(widget.idAlerta!, resolucion: 'Atendida');
+      await AlertasService.resolverAlerta(
+        widget.idAlerta!,
+        resolucion: 'Atendida',
+        idPaciente: widget.idPaciente,
+        nombrePaciente: widget.nombrePaciente,
+        latitud: widget.latitud,
+        longitud: widget.longitud,
+      );
     }
 
     final estabaBloqueado = await AlarmasNativasService.estaPantallaBloqueada();

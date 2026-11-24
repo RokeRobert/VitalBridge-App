@@ -156,15 +156,13 @@ class AlertasService {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         final listaRemota = data.map((item) => AlertaSosModel.fromJson(item)).toList();
-        if (listaRemota.isNotEmpty) {
-          try {
-            await prefs.setString(
-              _keyHistorialAlertasAtendidas,
-              jsonEncode(listaRemota.map((a) => a.toJson()).toList()),
-            );
-          } catch (_) {}
-          return listaRemota;
-        }
+        try {
+          await prefs.setString(
+            _keyHistorialAlertasAtendidas,
+            jsonEncode(listaRemota.map((a) => a.toJson()).toList()),
+          );
+        } catch (_) {}
+        return listaRemota;
       }
     } catch (_) {
       // Si falla la red o está desconectado, recurrir a almacenamiento local
@@ -179,46 +177,8 @@ class AlertasService {
       } catch (_) {}
     }
 
-    // 2. Si no hay registros previos, proveer datos semilla realistas de demostración
-    if (resultado.isEmpty) {
-      final resueltasMemoria = _alertasSimuladas.where((a) => !a.esActiva).toList();
-      if (resueltasMemoria.isNotEmpty) {
-        resultado.addAll(resueltasMemoria);
-      } else {
-        final ahora = DateTime.now();
-        resultado = [
-          AlertaSosModel(
-            id: 801,
-            idPaciente: pacienteId ?? '00000000-0000-0000-0000-000000000045',
-            nombrePaciente: 'Don Roberto',
-            fechaCreacion: ahora.subtract(const Duration(days: 1, hours: 2, minutes: 15)),
-            idEstadoAlerta: 2,
-            estado: 'Atendida',
-            latitud: 19.432608,
-            longitud: -99.133209,
-          ),
-          AlertaSosModel(
-            id: 802,
-            idPaciente: pacienteId ?? '00000000-0000-0000-0000-000000000045',
-            nombrePaciente: 'Don Roberto',
-            fechaCreacion: ahora.subtract(const Duration(days: 3, hours: 6, minutes: 40)),
-            idEstadoAlerta: 2,
-            estado: 'Atendida',
-            latitud: 19.434211,
-            longitud: -99.135422,
-          ),
-        ];
-        try {
-          await prefs.setString(
-            _keyHistorialAlertasAtendidas,
-            jsonEncode(resultado.map((a) => a.toJson()).toList()),
-          );
-        } catch (_) {}
-      }
-    }
-
-    // Filtrar por paciente si se especificó
-    if (pacienteId != null && pacienteId.isNotEmpty) {
+    // Filtrar por paciente si se especificó y tenemos resultados locales
+    if (pacienteId != null && pacienteId.isNotEmpty && resultado.isNotEmpty) {
       return resultado.where((a) => a.idPaciente == pacienteId).toList();
     }
     return resultado;
@@ -243,7 +203,14 @@ class AlertasService {
   }
 
   /// Marca una alerta como atendida o resuelta
-  static Future<bool> resolverAlerta(int idAlerta, {String resolucion = 'Atendida'}) async {
+  static Future<bool> resolverAlerta(
+    int idAlerta, {
+    String resolucion = 'Atendida',
+    String? idPaciente,
+    String? nombrePaciente,
+    double? latitud,
+    double? longitud,
+  }) async {
     try {
       final headers = await _obtenerHeaders();
       final response = await http
@@ -259,14 +226,27 @@ class AlertasService {
           .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        _marcarAlertaResuelta(idAlerta, resolucion);
+        _marcarAlertaResuelta(
+          idAlerta,
+          resolucion,
+          idPaciente: idPaciente,
+          nombrePaciente: nombrePaciente,
+          latitud: latitud,
+          longitud: longitud,
+        );
         return true;
       }
     } catch (_) {
-      _marcarAlertaResuelta(idAlerta, resolucion);
-      return true;
+      // Modo offline / fallo de conexión
     }
-    _marcarAlertaResuelta(idAlerta, resolucion);
+    _marcarAlertaResuelta(
+      idAlerta,
+      resolucion,
+      idPaciente: idPaciente,
+      nombrePaciente: nombrePaciente,
+      latitud: latitud,
+      longitud: longitud,
+    );
     return true;
   }
 
@@ -294,11 +274,19 @@ class AlertasService {
     }
   }
 
-  static void _marcarAlertaResuelta(int idAlerta, String resolucion) {
+  static void _marcarAlertaResuelta(
+    int idAlerta,
+    String resolucion, {
+    String? idPaciente,
+    String? nombrePaciente,
+    double? latitud,
+    double? longitud,
+  }) {
     final index = _alertasSimuladas.indexWhere((a) => a.id == idAlerta);
+    AlertaSosModel resuelta;
     if (index != -1) {
       final a = _alertasSimuladas[index];
-      final resuelta = AlertaSosModel(
+      resuelta = AlertaSosModel(
         id: a.id,
         idPaciente: a.idPaciente,
         nombrePaciente: a.nombrePaciente,
@@ -309,7 +297,18 @@ class AlertasService {
         longitud: a.longitud,
       );
       _alertasSimuladas[index] = resuelta;
-      _guardarEnHistorialAtendidas(resuelta);
+    } else {
+      resuelta = AlertaSosModel(
+        id: idAlerta,
+        idPaciente: idPaciente ?? '',
+        nombrePaciente: nombrePaciente ?? 'Paciente',
+        fechaCreacion: DateTime.now(),
+        idEstadoAlerta: 2,
+        estado: resolucion,
+        latitud: latitud,
+        longitud: longitud,
+      );
     }
+    _guardarEnHistorialAtendidas(resuelta);
   }
 }

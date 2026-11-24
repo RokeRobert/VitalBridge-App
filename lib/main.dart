@@ -38,6 +38,7 @@ void main() async {
   if (payloadAlarma != null) {
     if (payloadAlarma['tipo'] == 'SOS') {
       final idAlerta = int.tryParse(payloadAlarma['idAlerta']?.toString() ?? '0');
+      final idPaciente = payloadAlarma['idPaciente']?.toString() ?? '';
       final latitud = double.tryParse(payloadAlarma['latitud']?.toString() ?? '');
       final longitud = double.tryParse(payloadAlarma['longitud']?.toString() ?? '');
       final nombrePaciente = payloadAlarma['nombrePaciente']?.toString() ?? 'Paciente';
@@ -46,6 +47,7 @@ void main() async {
       AlarmasNativasService.cancelarNotificacionSos();
       pantallaInicial = AlertaSosCuidadorScreen(
         nombrePaciente: nombrePaciente,
+        idPaciente: idPaciente,
         idAlerta: idAlerta,
         latitud: latitud,
         longitud: longitud,

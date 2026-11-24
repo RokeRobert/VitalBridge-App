@@ -6,6 +6,7 @@ import 'package:vital_bridge/models/paciente_model.dart';
 import 'package:vital_bridge/models/toma_model.dart';
 import 'package:vital_bridge/screens/agregar_medicamento_screen.dart';
 import 'package:vital_bridge/screens/alerta_sos_cuidador_screen.dart';
+import 'package:vital_bridge/screens/historial_tomas_screen.dart';
 import 'package:vital_bridge/screens/login_screen.dart';
 import 'package:vital_bridge/screens/perfil_cuidador_screen.dart';
 import 'package:vital_bridge/screens/perfil_paciente_screen.dart';
@@ -647,7 +648,64 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+
+            // Acceso rápido a Historial de Cumplimiento y Alertas
+            InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                setState(() => _tabSeleccionado = 2);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.lilaSuave.withValues(alpha: 0.4)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.azulOscuro.withValues(alpha: 0.03),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.moradoOscuro.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.history_rounded, size: 20, color: AppColors.moradoOscuro),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Historial de Cumplimiento y Alertas',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.azulOscuro,
+                            ),
+                          ),
+                          Text(
+                            'Consulta tomas de días anteriores y auxilio SOS',
+                            style: TextStyle(fontSize: 11.5, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: AppColors.moradoOscuro, size: 22),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // Tarjeta de Guía Rápida de Inicio
             Container(
@@ -1235,7 +1293,64 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
                 );
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+
+            // Acceso rápido a Historial de Cumplimiento y Alertas
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () {
+                setState(() => _tabSeleccionado = 2);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.lilaSuave.withValues(alpha: 0.35)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.azulOscuro.withValues(alpha: 0.03),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: AppColors.moradoOscuro.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.history_rounded, size: 18, color: AppColors.moradoOscuro),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Historial de Cumplimiento y Alertas',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.azulOscuro,
+                            ),
+                          ),
+                          Text(
+                            'Consulta tomas de días anteriores y auxilio SOS',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: AppColors.moradoOscuro, size: 20),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // Sección: Seguimiento de Medicamentos de Hoy
             Row(
@@ -1545,25 +1660,28 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
     Widget cuerpo;
 
     if (_cargando) {
-      cuerpo = const Scaffold(
-        backgroundColor: AppColors.fondo,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(color: AppColors.moradoOscuro),
-              SizedBox(height: 16),
-              Text(
-                'Cargando panel de monitoreo...',
-                style: TextStyle(color: AppColors.azulOscuro, fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
+      cuerpo = const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: AppColors.moradoOscuro),
+            SizedBox(height: 16),
+            Text(
+              'Cargando panel de monitoreo...',
+              style: TextStyle(color: AppColors.azulOscuro, fontWeight: FontWeight.bold),
+            ),
+          ],
         ),
       );
     } else if (_tabSeleccionado == 1) {
       cuerpo = TratamientosScreen(mostrarBotonVolver: false, pacienteId: _pacienteSeleccionado?.id, nombrePaciente: _pacienteSeleccionado?.nombre);
     } else if (_tabSeleccionado == 2) {
+      cuerpo = HistorialTomasScreen(
+        mostrarBotonVolver: false,
+        pacienteIdInicial: _pacienteSeleccionado?.id,
+        nombrePacienteInicial: _pacienteSeleccionado?.nombre,
+      );
+    } else if (_tabSeleccionado == 3) {
       cuerpo = PerfilCuidadorScreen(
         onVolverAMonitoreo: () {
           setState(() => _tabSeleccionado = 0);
@@ -1616,6 +1734,10 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
             BottomNavigationBarItem(
               icon: Icon(Icons.medication_rounded),
               label: 'Tratamientos',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded),
+              label: 'Historial',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_rounded),

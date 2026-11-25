@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vital_bridge/models/tratamiento_model.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
@@ -131,12 +132,35 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
     super.dispose();
   }
 
+  /// Verifica si [hora] ya existe en [_horarios] (opcionalmente excluyendo [indiceActual]).
+  bool _esHorarioDuplicado(TimeOfDay hora, {int? indiceActual}) {
+    for (int i = 0; i < _horarios.length; i++) {
+      if (i != indiceActual && _horarios[i] == hora) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _mostrarAvisoHorarioDuplicado() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Ese horario ya fue agregado a la lista.'),
+        backgroundColor: AppColors.terracota,
+      ),
+    );
+  }
+
   Future<void> _seleccionarHora(int index) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _horarios[index],
     );
     if (picked != null) {
+      if (_esHorarioDuplicado(picked, indiceActual: index)) {
+        if (mounted) _mostrarAvisoHorarioDuplicado();
+        return;
+      }
       setState(() {
         _horarios[index] = picked;
       });
@@ -149,6 +173,10 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
       initialTime: const TimeOfDay(hour: 14, minute: 0),
     );
     if (picked != null) {
+      if (_esHorarioDuplicado(picked)) {
+        if (mounted) _mostrarAvisoHorarioDuplicado();
+        return;
+      }
       setState(() {
         _horarios.add(picked);
       });
@@ -168,11 +196,18 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
   }
 
   Future<void> _seleccionarFechaFin() async {
+    // Normaliza a medianoche para impedir seleccionar días anteriores a hoy.
+    final DateTime hoy = DateUtils.dateOnly(DateTime.now());
+    final DateTime fechaInicial = (_fechaFinPersonalizada != null &&
+            !DateUtils.dateOnly(_fechaFinPersonalizada!).isBefore(hoy))
+        ? _fechaFinPersonalizada!
+        : hoy.add(const Duration(days: 7));
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 7)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      initialDate: fechaInicial,
+      firstDate: hoy,
+      lastDate: hoy.add(const Duration(days: 365 * 5)),
     );
     if (picked != null) {
       setState(() {
@@ -223,6 +258,19 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('⚠️ Por favor selecciona al menos un día de la semana para la toma.'),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+        return;
+      }
+
+      if (!_esDePorVida &&
+          _duracionSeleccionada == 'Fecha específica' &&
+          _fechaFinPersonalizada != null &&
+          DateUtils.dateOnly(_fechaFinPersonalizada!).isBefore(DateUtils.dateOnly(DateTime.now()))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ La fecha de fin no puede ser anterior a hoy.'),
             backgroundColor: AppColors.terracota,
           ),
         );
@@ -490,14 +538,30 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
                 const SizedBox(height: 8),
                 TextFormField(
                   controller: _dosisController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    // Solo permite números enteros o decimales positivos (sin letras ni signos).
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Por favor especifica la dosis (ej. 1 tableta, 500 mg)';
+                    final texto = value?.trim() ?? '';
+                    if (texto.isEmpty) {
+                      return 'Por favor ingresa la cantidad de dosis (ej. 0.5, 1, 2)';
+                    }
+                    final dosis = double.tryParse(texto);
+                    if (dosis == null || dosis <= 0) {
+                      return 'Ingresa un número válido mayor a 0 (ej. 0.5, 1, 2)';
                     }
                     return null;
                   },
                   decoration: InputDecoration(
-                    hintText: 'Ej. 1 tableta (500 mg), 10 ml, 2 gotas',
+                    hintText: 'Ej. 0.5, 1, 2',
+                    suffixText: _resolverUnidadMedida(),
+                    suffixStyle: const TextStyle(
+                      color: AppColors.moradoOscuro,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                     hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 15),
                     filled: true,
                     fillColor: Colors.white,

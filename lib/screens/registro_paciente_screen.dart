@@ -516,7 +516,12 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 ),
-                validator: (val) => (val == null || val.trim().isEmpty) ? 'Ingresa el nombre del paciente' : null,
+                validator: (val) {
+                  final texto = val?.trim() ?? '';
+                  if (texto.isEmpty) return 'Ingresa el nombre del paciente';
+                  if (texto.length < 2) return 'El nombre debe tener al menos 2 caracteres';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -534,7 +539,12 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 ),
-                validator: (val) => (val == null || val.trim().isEmpty) ? 'Ingresa los apellidos' : null,
+                validator: (val) {
+                  final texto = val?.trim() ?? '';
+                  if (texto.isEmpty) return 'Ingresa los apellidos';
+                  if (texto.length < 2) return 'Los apellidos deben tener al menos 2 caracteres';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
 
@@ -598,15 +608,26 @@ class _RegistroPacienteScreenState extends State<RegistroPacienteScreen> {
               TextFormField(
                 controller: _telefonoCtrl,
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
                 decoration: InputDecoration(
-                  hintText: 'Ej. +34 610 345 872',
+                  hintText: 'Ej. 5512345678',
                   prefixIcon: const Icon(Icons.phone_outlined, color: AppColors.moradoOscuro),
                   filled: true,
                   fillColor: Colors.white,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                   enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
                 ),
-                validator: (val) => (val == null || val.trim().isEmpty) ? 'Ingresa el teléfono' : null,
+                validator: (val) {
+                  final texto = val?.trim() ?? '';
+                  if (texto.isEmpty) return 'Ingresa el teléfono';
+                  if (!RegExp(r'^\d{10}$').hasMatch(texto)) {
+                    return 'Ingresa un teléfono válido de 10 dígitos';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 32),
 

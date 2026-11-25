@@ -257,7 +257,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
       if (!_todosLosDias && !_diasSemana.containsValue(true)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('⚠️ Por favor selecciona al menos un día de la semana para la toma.'),
+            content: Text('Por favor selecciona al menos un día de la semana para la toma.'),
             backgroundColor: AppColors.terracota,
           ),
         );
@@ -270,7 +270,7 @@ class _AgregarMedicamentoScreenState extends State<AgregarMedicamentoScreen> {
           DateUtils.dateOnly(_fechaFinPersonalizada!).isBefore(DateUtils.dateOnly(DateTime.now()))) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('⚠️ La fecha de fin no puede ser anterior a hoy.'),
+            content: Text('La fecha de fin no puede ser anterior a hoy.'),
             backgroundColor: AppColors.terracota,
           ),
         );

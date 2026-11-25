@@ -238,7 +238,7 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                     children: [
                       Icon(Icons.check_circle_rounded, color: Colors.white),
                       SizedBox(width: 10),
-                      Text('✅ Datos guardados y sincronizados con éxito.'),
+                      Text('Datos guardados y sincronizados con éxito.'),
                     ],
                   ),
                   backgroundColor: Color(0xFF2C5E53),

@@ -31,6 +31,8 @@ class PerfilPacienteScreen extends StatefulWidget {
 }
 
 class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   static const List<String> _opcionesParentesco = [
     'Padre / Madre',
     'Abuelo / Abuela',
@@ -97,6 +99,7 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
   }
 
   void _cancelarEdicionPaciente() {
+    _formKey.currentState?.reset();
     setState(() {
       _nombreController.text = _savedNombre;
       _apellidosController.text = _savedApellidos;
@@ -115,7 +118,23 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
     );
   }
 
+  /// Valida que el teléfono no esté vacío y tenga un formato numérico válido (7 a 15 dígitos).
+  String? _validarTelefono(String? value) {
+    final texto = value?.trim() ?? '';
+    if (texto.isEmpty) {
+      return 'Ingresa el teléfono';
+    }
+    final formatoValido = RegExp(r'^\+?[\d\s\-()]+$').hasMatch(texto);
+    final soloDigitos = texto.replaceAll(RegExp(r'\D'), '');
+    if (!formatoValido || soloDigitos.length < 7 || soloDigitos.length > 15) {
+      return 'Formato de teléfono inválido (7 a 15 dígitos)';
+    }
+    return null;
+  }
+
   void _mostrarConfirmacionSobrescribirPaciente() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -474,7 +493,9 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
             // Contenedor blanco con información personal
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 26.0),
-              child: Column(
+              child: Form(
+                key: _formKey,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Título Sección: Información Personal
@@ -499,10 +520,12 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextField(
+                  TextFormField(
                     controller: _nombreController,
                     readOnly: !_editando,
                     onChanged: (val) => setState(() {}),
+                    validator: (val) =>
+                        (val == null || val.trim().isEmpty) ? 'Ingresa el nombre del paciente' : null,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 20),
                       filled: true,
@@ -518,6 +541,14 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                       ),
                     ),
                   ),
@@ -533,10 +564,12 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextField(
+                  TextFormField(
                     controller: _apellidosController,
                     readOnly: !_editando,
                     onChanged: (val) => setState(() {}),
+                    validator: (val) =>
+                        (val == null || val.trim().isEmpty) ? 'Ingresa los apellidos del paciente' : null,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 20),
                       filled: true,
@@ -552,6 +585,14 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                       ),
                     ),
                   ),
@@ -649,10 +690,11 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextField(
+                  TextFormField(
                     controller: _telefonoController,
                     readOnly: !_editando,
                     keyboardType: TextInputType.phone,
+                    validator: _validarTelefono,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF94A3B8), size: 20),
                       filled: true,
@@ -668,6 +710,14 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                       ),
                     ),
                   ),
@@ -751,6 +801,7 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                     ),
                   const SizedBox(height: 20),
                 ],
+              ),
               ),
             ),
           ],

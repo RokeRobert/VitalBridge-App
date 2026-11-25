@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/services/auth_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
@@ -377,10 +378,12 @@ class _RegistroScreenState extends State<RegistroScreen> {
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
+                    final texto = val?.trim() ?? '';
+                    if (texto.isEmpty) {
                       return 'Por favor ingresa tu correo electrónico';
                     }
-                    if (!val.contains('@') || !val.contains('.')) {
+                    final emailRegex = RegExp(r'^[\w\-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    if (!emailRegex.hasMatch(texto)) {
                       return 'Ingresa un correo electrónico válido';
                     }
                     return null;
@@ -441,14 +444,22 @@ class _RegistroScreenState extends State<RegistroScreen> {
                 TextFormField(
                   controller: _telefonoController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
                   validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
+                    final texto = val?.trim() ?? '';
+                    if (texto.isEmpty) {
                       return 'Por favor ingresa tu teléfono';
+                    }
+                    if (!RegExp(r'^\d{10}$').hasMatch(texto)) {
+                      return 'Ingresa un teléfono válido de 10 dígitos';
                     }
                     return null;
                   },
                   decoration: InputDecoration(
-                    hintText: '+34 600 000 000',
+                    hintText: '5512345678',
                     hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                     prefixIcon: const Icon(
                       Icons.phone_outlined,

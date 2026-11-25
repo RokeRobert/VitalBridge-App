@@ -24,6 +24,8 @@ class PerfilCuidadorScreen extends StatefulWidget {
 }
 
 class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   bool _editando = false;
   bool _cargando = true;
   bool _subiendoFoto = false;
@@ -116,6 +118,7 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
   }
 
   void _cancelarEdicionCuidador() {
+    _formKey.currentState?.reset();
     setState(() {
       _nombreController.text = _savedNombre;
       _apellidosController.text = _savedApellidos;
@@ -133,7 +136,23 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
     );
   }
 
+  /// Valida que el teléfono no esté vacío y tenga un formato numérico válido (7 a 15 dígitos).
+  String? _validarTelefono(String? value) {
+    final texto = value?.trim() ?? '';
+    if (texto.isEmpty) {
+      return 'Ingresa tu teléfono';
+    }
+    final formatoValido = RegExp(r'^\+?[\d\s\-()]+$').hasMatch(texto);
+    final soloDigitos = texto.replaceAll(RegExp(r'\D'), '');
+    if (!formatoValido || soloDigitos.length < 7 || soloDigitos.length > 15) {
+      return 'Formato de teléfono inválido (7 a 15 dígitos)';
+    }
+    return null;
+  }
+
   void _mostrarConfirmacionSobrescribirCuidador() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
@@ -516,7 +535,9 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
             // Contenedor blanco con información personal y pacientes
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 24.0),
-              child: Column(
+              child: Form(
+                key: _formKey,
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Título Sección: Información Personal
@@ -547,10 +568,12 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextField(
+                            TextFormField(
                               controller: _nombreController,
                               readOnly: !_editando,
                               onChanged: (val) => setState(() {}),
+                              validator: (val) =>
+                                  (val == null || val.trim().isEmpty) ? 'Ingresa tu nombre' : null,
                               decoration: InputDecoration(
                                 prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 19),
                                 filled: true,
@@ -566,6 +589,14 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                                ),
+                                focusedErrorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                                 ),
                               ),
                             ),
@@ -586,10 +617,12 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                               ),
                             ),
                             const SizedBox(height: 6),
-                            TextField(
+                            TextFormField(
                               controller: _apellidosController,
                               readOnly: !_editando,
                               onChanged: (val) => setState(() {}),
+                              validator: (val) =>
+                                  (val == null || val.trim().isEmpty) ? 'Ingresa tus apellidos' : null,
                               decoration: InputDecoration(
                                 prefixIcon: const Icon(Icons.person_outline_rounded, color: Color(0xFF94A3B8), size: 19),
                                 filled: true,
@@ -605,6 +638,14 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(16),
                                   borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                                ),
+                                errorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                                ),
+                                focusedErrorBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                  borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                                 ),
                               ),
                             ),
@@ -659,10 +700,11 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  TextField(
+                  TextFormField(
                     controller: _telefonoController,
                     readOnly: !_editando,
                     keyboardType: TextInputType.phone,
+                    validator: _validarTelefono,
                     decoration: InputDecoration(
                       prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF94A3B8), size: 19),
                       filled: true,
@@ -678,6 +720,14 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: const BorderSide(color: AppColors.turquesa, width: 2),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 1.4),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: const BorderSide(color: AppColors.terracota, width: 2),
                       ),
                     ),
                   ),
@@ -1028,6 +1078,7 @@ class _PerfilCuidadorScreenState extends State<PerfilCuidadorScreen> {
                   ),
                   SizedBox(height: 32 + MediaQuery.paddingOf(context).bottom),
                 ],
+              ),
               ),
             ),
           ],

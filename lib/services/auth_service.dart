@@ -336,6 +336,7 @@ class AuthService {
   static Future<Map<String, dynamic>> iniciarSesionConGoogle() async {
     try {
       final googleSignIn = GoogleSignIn(
+        serverClientId: ApiConstants.googleWebClientId,
         scopes: ['email', 'profile'],
       );
 

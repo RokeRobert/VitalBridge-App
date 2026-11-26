@@ -59,4 +59,7 @@ class ApiConstants {
   // --- Endpoints de Perfiles y Almacenamiento de Fotos (/api/perfiles) ---
   static String get subirFotoPerfil => '$baseUrl/perfiles/foto';
   static String perfilUsuario(String id) => '$baseUrl/perfiles/usuario/$id';
+
+  // --- Autenticación Social con Google OAuth 2.0 ---
+  static const String googleWebClientId = '779278683987-ujtclea59n9eo6s96jsr2e1sgga7ijie.apps.googleusercontent.com';
 }

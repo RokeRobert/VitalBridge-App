@@ -509,4 +509,14 @@ class AlarmasNativasService {
       await _channelPermisos.invokeMethod('abrirEnlace', {'url': url});
     } catch (_) {}
   }
+
+  /// Inicia el marcador telefónico nativo con el número indicado
+  static Future<bool> iniciarLlamada(String telefono) async {
+    try {
+      final res = await _channelPermisos.invokeMethod('iniciarLlamada', {'telefono': telefono});
+      return res == true;
+    } catch (_) {
+      return false;
+    }
+  }
 }

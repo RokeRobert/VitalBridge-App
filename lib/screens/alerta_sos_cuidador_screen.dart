@@ -137,35 +137,30 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
     }
   }
 
-  void _llamarPaciente() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.phone_in_talk_rounded, color: Color(0xFFE25C54)),
-            SizedBox(width: 10),
-            Text('Llamada de Emergencia', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
+  Future<void> _llamarPaciente() async {
+    _detenerSirena();
+    final telefonoOriginal = widget.telefono.trim();
+    final telefonoLimpio = telefonoOriginal.replaceAll(RegExp(r'[^\d+]'), '');
+
+    if (telefonoLimpio.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El paciente no tiene un número telefónico válido registrado.'),
+          backgroundColor: AppColors.terracota,
         ),
-        content: Text(
-          'Llamando a ${widget.nombrePaciente} (${widget.telefono})...\n\nSi no contesta, el sistema mantendrá la alarma activa.',
-          style: const TextStyle(fontSize: 14.5, color: Color(0xFF475569)),
+      );
+      return;
+    }
+
+    final exito = await AlarmasNativasService.iniciarLlamada(telefonoLimpio);
+    if (!exito && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No fue posible abrir el marcador telefónico para $telefonoLimpio.'),
+          backgroundColor: AppColors.terracota,
         ),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE25C54),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Colgar', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   void _verUbicacion() {
@@ -338,48 +333,17 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
     );
   }
 
-  void _llamar911() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.emergency_rounded, color: Color(0xFFE25C54), size: 28),
-            SizedBox(width: 10),
-            Text('Llamar al 911', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
+  Future<void> _llamar911() async {
+    _detenerSirena();
+    final exito = await AlarmasNativasService.iniciarLlamada('911');
+    if (!exito && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No fue posible abrir el marcador telefónico para el 911.'),
+          backgroundColor: AppColors.terracota,
         ),
-        content: const Text(
-          '¿Deseas conectar inmediatamente con la línea de emergencias médicas 911?',
-          style: TextStyle(fontSize: 14.5, color: Color(0xFF475569)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFE25C54),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Conectando con Servicios de Emergencia 911...'),
-                  backgroundColor: Color(0xFFE25C54),
-                  duration: Duration(seconds: 3),
-                ),
-              );
-            },
-            child: const Text('Llamar al 911', style: TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   Widget _buildBotonAccion({

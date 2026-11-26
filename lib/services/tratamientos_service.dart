@@ -247,14 +247,9 @@ class TratamientosService {
         };
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('Error de conexión al agregar tratamiento: $e');
-      _tratamientosSimulados.insert(0, nuevoTratamiento);
       return {
-        'exito': true,
-        'modoSimulacion': true,
-        'tratamiento': nuevoTratamiento,
-        'mensaje': 'Guardado localmente (modo sin conexión)',
+        'exito': false,
+        'mensaje': 'No fue posible registrar el tratamiento. Error de conexión con el servidor: $e',
       };
     }
   }
@@ -294,37 +289,15 @@ class TratamientosService {
         };
       }
     } catch (e) {
-      // ignore: avoid_print
-      print('Error de conexión al actualizar tratamiento: $e');
-      final index = _tratamientosSimulados.indexWhere((t) => t.id == tratamiento.id);
-      if (index != -1) {
-        _tratamientosSimulados[index] = tratamiento;
-      }
       return {
-        'exito': true,
-        'modoSimulacion': true,
-        'tratamiento': tratamiento,
-        'mensaje': 'Actualizado localmente (modo sin conexión)',
+        'exito': false,
+        'mensaje': 'No se pudo actualizar el tratamiento en el servidor: $e',
       };
     }
   }
 
   /// Elimina un tratamiento por su ID (Borrado lógico en el backend y reflejo inmediato)
   static Future<bool> eliminarTratamiento(int id) async {
-    final index = _tratamientosSimulados.indexWhere((t) => t.id == id);
-    String medicamentoBorrado = '';
-    if (index != -1) {
-      medicamentoBorrado = _tratamientosSimulados[index].medicamento.trim().toLowerCase();
-      _tratamientosSimulados.removeAt(index);
-    }
-
-    _tomasHoySimuladas.removeWhere((toma) {
-      final coincideId = toma.idTratamiento == id;
-      final coincideNombre = medicamentoBorrado.isNotEmpty &&
-          toma.medicamento.trim().toLowerCase() == medicamentoBorrado;
-      return coincideId || coincideNombre;
-    });
-
     try {
       final headers = await _obtenerHeaders();
       final response = await http
@@ -332,9 +305,23 @@ class TratamientosService {
             Uri.parse('${ApiConstants.tratamientos}/$id'),
             headers: headers,
           )
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
+        final index = _tratamientosSimulados.indexWhere((t) => t.id == id);
+        String medicamentoBorrado = '';
+        if (index != -1) {
+          medicamentoBorrado = _tratamientosSimulados[index].medicamento.trim().toLowerCase();
+          _tratamientosSimulados.removeAt(index);
+        }
+
+        _tomasHoySimuladas.removeWhere((toma) {
+          final coincideId = toma.idTratamiento == id;
+          final coincideNombre = medicamentoBorrado.isNotEmpty &&
+              toma.medicamento.trim().toLowerCase() == medicamentoBorrado;
+          return coincideId || coincideNombre;
+        });
+
         _tratamientosSimulados.removeWhere((t) => t.id == id);
         return true;
       }
@@ -342,8 +329,7 @@ class TratamientosService {
     } catch (e) {
       // ignore: avoid_print
       print('Error de conexión al eliminar tratamiento: $e');
-      _tratamientosSimulados.removeWhere((t) => t.id == id);
-      return true;
+      return false;
     }
   }
 

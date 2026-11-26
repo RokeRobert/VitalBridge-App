@@ -99,25 +99,19 @@ class AlertasService {
       if (response.statusCode == 201 || response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final nueva = AlertaSosModel.fromJson(data);
-        _alertasSimuladas.insert(0, nueva);
         return {'exito': true, 'alerta': nueva};
+      } else {
+        return {
+          'exito': false,
+          'mensaje': 'Error del servidor (${response.statusCode}) al emitir alerta SOS.',
+        };
       }
-    } catch (_) {
-      // Modo desarrollo / offline
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'No se pudo emitir la alerta SOS hacia el servidor central: $e',
+      };
     }
-
-    final simulada = AlertaSosModel(
-      id: DateTime.now().millisecondsSinceEpoch % 10000,
-      idPaciente: idPaciente,
-      nombrePaciente: 'Paciente',
-      fechaCreacion: DateTime.now(),
-      idEstadoAlerta: 1,
-      estado: 'Activa',
-      latitud: latitud,
-      longitud: longitud,
-    );
-    _alertasSimuladas.insert(0, simulada);
-    return {'exito': true, 'modoSimulacion': true, 'alerta': simulada};
   }
 
   static const String _keyHistorialAlertasAtendidas = 'historial_alertas_atendidas_json';

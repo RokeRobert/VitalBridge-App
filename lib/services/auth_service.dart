@@ -49,7 +49,7 @@ class AuthService {
           await _limpiarCachesLocales(prefs);
         }
 
-        await prefs.setString(_keyToken, usuario.token ?? 'token_simulado');
+        await prefs.setString(_keyToken, usuario.token ?? '');
         await prefs.setString(_keyUsuarioId, usuario.id);
         await prefs.setString(_keyRol, 'cuidador');
         await prefs.setString('usuario_nombre', usuario.nombre);
@@ -113,24 +113,33 @@ class AuthService {
             : <String, dynamic>{};
 
         final usuario = UsuarioModel.fromJson(userMap);
+        final bool requiereConfirmacion = data['requiereConfirmacion'] == true ||
+            (usuario.token == null || usuario.token!.isEmpty);
 
         // Limpiar cachés de cualquier cuenta previa en el dispositivo
         final prefs = await SharedPreferences.getInstance();
         await _limpiarCachesLocales(prefs);
 
-        // Guardar sesión activa del nuevo cuidador registrado
-        await prefs.setString(_keyToken, usuario.token ?? '');
-        await prefs.setString(_keyUsuarioId, usuario.id);
-        await prefs.setString(_keyRol, 'cuidador');
-        await prefs.setString('usuario_nombre', usuario.nombre.isNotEmpty ? usuario.nombre : nombre.trim());
-        await prefs.setString('usuario_apellidos', usuario.apellidos.isNotEmpty ? usuario.apellidos : apellidos.trim());
-        await prefs.setString('usuario_correo', usuario.correo.isNotEmpty ? usuario.correo : correo.trim());
-        await prefs.setString('usuario_telefono', usuario.telefono.isNotEmpty ? usuario.telefono : telefono.trim());
-        if (usuario.foto != null && usuario.foto!.isNotEmpty) {
-          await prefs.setString('usuario_foto', usuario.foto!);
+        // Guardar sesión activa del nuevo cuidador registrado solo si ya tiene token
+        if (!requiereConfirmacion && usuario.token != null && usuario.token!.isNotEmpty) {
+          await prefs.setString(_keyToken, usuario.token!);
+          await prefs.setString(_keyUsuarioId, usuario.id);
+          await prefs.setString(_keyRol, 'cuidador');
+          await prefs.setString('usuario_nombre', usuario.nombre.isNotEmpty ? usuario.nombre : nombre.trim());
+          await prefs.setString('usuario_apellidos', usuario.apellidos.isNotEmpty ? usuario.apellidos : apellidos.trim());
+          await prefs.setString('usuario_correo', usuario.correo.isNotEmpty ? usuario.correo : correo.trim());
+          await prefs.setString('usuario_telefono', usuario.telefono.isNotEmpty ? usuario.telefono : telefono.trim());
+          if (usuario.foto != null && usuario.foto!.isNotEmpty) {
+            await prefs.setString('usuario_foto', usuario.foto!);
+          }
         }
 
-        return {'exito': true, 'data': data, 'usuario': usuario};
+        return {
+          'exito': true,
+          'data': data,
+          'usuario': usuario,
+          'requiereConfirmacion': requiereConfirmacion,
+        };
       } else {
         final error = jsonDecode(response.body);
         return {
@@ -139,11 +148,9 @@ class AuthService {
         };
       }
     } catch (e) {
-      // Modo desarrollo si el backend aún no está encendido
       return {
-        'exito': true,
-        'modoSimulacion': true,
-        'mensaje': 'Cuenta creada en modo local/desarrollo.',
+        'exito': false,
+        'mensaje': 'Error al conectar con el servidor: $e',
       };
     }
   }
@@ -177,18 +184,9 @@ class AuthService {
         return {'exito': false, 'mensaje': 'Código de token inválido o expirado.'};
       }
     } catch (e) {
-      // Modo desarrollo / respaldo si no hay conexión al backend
       return {
-        'exito': true,
-        'modoSimulacion': true,
-        'paciente': PacienteModel(
-          id: '00000000-0000-0000-0000-000000000045',
-          nombre: 'Roberto',
-          apellidos: 'Gómez',
-          parentesco: 'Padre',
-          telefono: '+34 610 345 872',
-          token: token,
-        ),
+        'exito': false,
+        'mensaje': 'Error de conexión al validar código con el servidor: $e',
       };
     }
   }
@@ -229,6 +227,107 @@ class AuthService {
   static Future<String?> obtenerTokenGuardado() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_keyToken);
+  }
+
+  /// Solicita el restablecimiento de contraseña enviando un código OTP al correo
+  static Future<Map<String, dynamic>> solicitarRecuperacionPassword(String correo) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.recuperarPassword),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'correo': correo.trim()}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['exito'] == true) {
+        return {
+          'exito': true,
+          'mensaje': data['mensaje'] ?? 'Código de recuperación enviado.',
+        };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': data['mensaje'] ?? 'No se pudo enviar el correo de recuperación.',
+        };
+      }
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'Error de conexión al solicitar recuperación: $e',
+      };
+    }
+  }
+
+  /// Restablece la contraseña utilizando el código OTP recibido por correo
+  static Future<Map<String, dynamic>> restablecerPassword({
+    required String correo,
+    required String codigo,
+    required String nuevaContrasena,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.restablecerPassword),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'correo': correo.trim(),
+              'codigo': codigo.trim(),
+              'nuevaContrasena': nuevaContrasena.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['exito'] == true) {
+        return {
+          'exito': true,
+          'mensaje': data['mensaje'] ?? 'Contraseña restablecida exitosamente.',
+        };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': data['mensaje'] ?? 'No se pudo restablecer la contraseña.',
+        };
+      }
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'Error de conexión al restablecer contraseña: $e',
+      };
+    }
+  }
+
+  /// Solicita el reenvío del correo de activación / confirmación de cuenta
+  static Future<Map<String, dynamic>> reenviarConfirmacion(String correo) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.reenviarConfirmacion),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'correo': correo.trim()}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['exito'] == true) {
+        return {
+          'exito': true,
+          'mensaje': data['mensaje'] ?? 'Correo de activación reenviado.',
+        };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': data['mensaje'] ?? 'No se pudo reenviar la confirmación.',
+        };
+      }
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'Error de conexión al reenviar confirmación: $e',
+      };
+    }
   }
 }
 

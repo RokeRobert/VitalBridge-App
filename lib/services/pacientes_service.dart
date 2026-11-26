@@ -188,47 +188,26 @@ class PacientesService {
           'paciente': nuevoPaciente,
           'token': nuevoPaciente.token ?? tokenGenerado,
         };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': 'Error del servidor (${response.statusCode}) al registrar paciente.',
+        };
       }
-    } catch (_) {
-      // Fallback para desarrollo sin conexión
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'No se pudo conectar con el servidor para registrar al paciente: $e',
+      };
     }
-
-    // Creación local para que la UI funcione de inmediato
-    final nuevoPacienteLocal = PacienteModel(
-      id: 'paciente-${DateTime.now().millisecondsSinceEpoch}',
-      nombre: nombre.trim(),
-      apellidos: apellidos.trim(),
-      parentesco: parentesco.trim(),
-      telefono: telefono.trim(),
-      idUsuario: usuarioId,
-      token: tokenGenerado,
-      tipoPaciente: idTipoPaciente == 1
-          ? 'Adulto Mayor'
-          : (idTipoPaciente == 2 ? 'Paciente Crónico' : 'General'),
-      fechaRegistro: DateTime.now(),
-    );
-
-    _pacientesEnMemoria.removeWhere((p) => p.id == nuevoPacienteLocal.id);
-    _pacientesEnMemoria.add(nuevoPacienteLocal);
-    await prefs.setString(
-      cacheKey,
-      jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
-    );
-    await guardarIdPacienteSeleccionado(nuevoPacienteLocal.id);
-
-    return {
-      'exito': true,
-      'mensaje': 'Paciente creado exitosamente.',
-      'paciente': nuevoPacienteLocal,
-      'token': tokenGenerado,
-    };
   }
 
-  /// Desactiva lógicamente (Soft Delete) a un paciente
+  /// Desactiva lógicamente (Soft Delete / Archivar) a un paciente
   static Future<bool> eliminarPaciente(String idPaciente) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('auth_token') ?? '';
+      final usuarioId = prefs.getString('auth_user_id') ?? '';
 
       final response = await http
           .delete(
@@ -236,27 +215,32 @@ class PacientesService {
             headers: {
               'Content-Type': 'application/json',
               if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+              if (usuarioId.isNotEmpty) 'X-User-Id': usuarioId,
             },
           )
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         _pacientesEnMemoria.removeWhere((p) => p.id == idPaciente);
-        final usuarioId = prefs.getString('auth_user_id') ?? '';
         if (usuarioId.isNotEmpty) {
           await prefs.setString(
             'cache_pacientes_json_$usuarioId',
             jsonEncode(_pacientesEnMemoria.map((p) => p.toJson()).toList()),
           );
+          final idActivo = await obtenerIdPacienteSeleccionado();
+          if (idActivo == idPaciente) {
+            final siguiente = _pacientesEnMemoria.isNotEmpty ? _pacientesEnMemoria.first.id : '';
+            await guardarIdPacienteSeleccionado(siguiente);
+          }
         }
         return true;
       }
-    } catch (_) {
-      // Fallback local
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error al archivar paciente: $e');
     }
 
-    _pacientesEnMemoria.removeWhere((p) => p.id == idPaciente);
-    return true;
+    return false;
   }
 }
 

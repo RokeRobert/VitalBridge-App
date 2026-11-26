@@ -74,12 +74,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (res['exito'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['modoSimulacion'] == true
-                ? 'Sesión iniciada (Modo desarrollo / offline)'
-                : 'Bienvenido a VitalBridge'),
-            backgroundColor: const Color(0xFF336C60),
-            duration: const Duration(seconds: 2),
+          const SnackBar(
+            content: Text('Bienvenido a VitalBridge'),
+            backgroundColor: Color(0xFF336C60),
+            duration: Duration(seconds: 2),
           ),
         );
         FcmService.sincronizarTokenCuidador();
@@ -87,12 +85,17 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(res['mensaje'] ?? 'Error al iniciar sesión'),
-            backgroundColor: AppColors.terracota,
-          ),
-        );
+        final mensaje = res['mensaje'] ?? 'Error al iniciar sesión';
+        if (mensaje.toString().toLowerCase().contains('confirmad')) {
+          _mostrarDialogoReenviarConfirmacion(correo);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(mensaje),
+              backgroundColor: AppColors.terracota,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -108,6 +111,431 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _cargandoCuidador = false);
       }
     }
+  }
+
+  // Cuidador: Diálogo para reenviar correo de confirmación de cuenta
+  void _mostrarDialogoReenviarConfirmacion(String correo) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        bool reenviando = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Text(
+                'Confirmación pendiente',
+                style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.moradoOscuro),
+              ),
+              content: Text(
+                'Tu cuenta aún no ha sido confirmada. Revisa la bandeja de entrada o spam de $correo.\n\n¿Deseas que te reenviemos el enlace de confirmación?',
+                style: const TextStyle(fontSize: 14.5, color: Color(0xFF4A5568)),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text('Cancelar', style: TextStyle(color: Color(0xFF718096))),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.moradoOscuro,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: reenviando
+                      ? null
+                      : () async {
+                          setDialogState(() => reenviando = true);
+                          final res = await AuthService.reenviarConfirmacion(correo);
+                          if (!mounted || !dialogCtx.mounted) return;
+                          Navigator.pop(dialogCtx);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(res['mensaje'] ?? 'Solicitud procesada'),
+                              backgroundColor: res['exito'] == true
+                                  ? const Color(0xFF336C60)
+                                  : AppColors.terracota,
+                            ),
+                          );
+                        },
+                  child: reenviando
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text('Reenviar enlace', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Cuidador: Modal para recuperar y restablecer contraseña mediante código OTP
+  void _mostrarModalRecuperarPassword() {
+    final correoRecuperarController = TextEditingController(text: _emailController.text.trim());
+    final codigoController = TextEditingController();
+    final nuevaPasswordController = TextEditingController();
+    final confirmarPasswordController = TextEditingController();
+
+    int paso = 1;
+    bool cargando = false;
+    bool obscureNueva = true;
+    bool obscureConfirmar = true;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (sheetCtx, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 20,
+                bottom: MediaQuery.of(sheetCtx).viewInsets.bottom + 28,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Container(
+                        width: 68,
+                        height: 68,
+                        decoration: BoxDecoration(
+                          color: paso == 1
+                              ? const Color(0xFFEFEBF6)
+                              : const Color(0xFFE6F4F1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          paso == 1
+                              ? Icons.lock_reset_rounded
+                              : Icons.mark_email_read_rounded,
+                          color: paso == 1
+                              ? AppColors.moradoOscuro
+                              : const Color(0xFF336C60),
+                          size: 34,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      paso == 1
+                          ? 'Recuperar Contraseña'
+                          : 'Restablecer Contraseña',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.moradoOscuro,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      paso == 1
+                          ? 'Ingresa tu correo electrónico registrado. Te enviaremos un código de seguridad para restablecer tu contraseña.'
+                          : 'Ingresa el código recibido en ${correoRecuperarController.text.trim()} y define tu nueva contraseña.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF64748B),
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    if (paso == 1) ...[
+                      TextField(
+                        controller: correoRecuperarController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: InputDecoration(
+                          hintText: 'ejemplo@correo.com',
+                          labelText: 'Correo electrónico',
+                          prefixIcon: const Icon(Icons.mail_outline_rounded, color: AppColors.moradoOscuro),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.moradoOscuro,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: cargando
+                            ? null
+                            : () async {
+                                final correo = correoRecuperarController.text.trim();
+                                if (correo.isEmpty || !correo.contains('@')) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Por favor ingresa un correo electrónico válido.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setModalState(() => cargando = true);
+                                final res = await AuthService.solicitarRecuperacionPassword(correo);
+                                if (!mounted || !modalCtx.mounted) return;
+                                setModalState(() => cargando = false);
+
+                                if (res['exito'] == true) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(res['mensaje'] ?? 'Código enviado a tu correo.'),
+                                      backgroundColor: const Color(0xFF336C60),
+                                    ),
+                                  );
+                                  setModalState(() => paso = 2);
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(res['mensaje'] ?? 'No se pudo enviar el código.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                }
+                              },
+                        child: cargando
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              )
+                            : const Text(
+                                'Enviar Código de Seguridad',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: codigoController,
+                        textAlign: TextAlign.center,
+                        keyboardType: TextInputType.text,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 4.0,
+                          color: AppColors.moradoOscuro,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'CÓDIGO (EJ. 123456)',
+                          labelText: 'Código de seguridad',
+                          prefixIcon: const Icon(Icons.key_rounded, color: AppColors.moradoOscuro),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: nuevaPasswordController,
+                        obscureText: obscureNueva,
+                        decoration: InputDecoration(
+                          labelText: 'Nueva contraseña',
+                          hintText: 'Mínimo 6 caracteres',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.moradoOscuro),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureNueva ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                              color: const Color(0xFF988FB6),
+                            ),
+                            onPressed: () => setModalState(() => obscureNueva = !obscureNueva),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: confirmarPasswordController,
+                        obscureText: obscureConfirmar,
+                        decoration: InputDecoration(
+                          labelText: 'Confirmar nueva contraseña',
+                          hintText: 'Repite la contraseña',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppColors.moradoOscuro),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              obscureConfirmar ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                              color: const Color(0xFF988FB6),
+                            ),
+                            onPressed: () => setModalState(() => obscureConfirmar = !obscureConfirmar),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: AppColors.moradoOscuro, width: 2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF336C60),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        onPressed: cargando
+                            ? null
+                            : () async {
+                                final codigo = codigoController.text.trim();
+                                final nueva = nuevaPasswordController.text.trim();
+                                final confirmar = confirmarPasswordController.text.trim();
+
+                                if (codigo.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Ingresa el código recibido en tu correo.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (nueva.length < 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('La contraseña debe tener al menos 6 caracteres.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (nueva != confirmar) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Las contraseñas no coinciden.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                  return;
+                                }
+
+                                setModalState(() => cargando = true);
+                                final res = await AuthService.restablecerPassword(
+                                  correo: correoRecuperarController.text.trim(),
+                                  codigo: codigo,
+                                  nuevaContrasena: nueva,
+                                );
+                                if (!mounted || !modalCtx.mounted) return;
+                                setModalState(() => cargando = false);
+
+                                if (res['exito'] == true) {
+                                  Navigator.pop(modalCtx);
+                                  _emailController.text = correoRecuperarController.text.trim();
+                                  _passwordController.text = nueva;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(res['mensaje'] ?? 'Contraseña restablecida exitosamente.'),
+                                      backgroundColor: const Color(0xFF336C60),
+                                      duration: const Duration(seconds: 4),
+                                    ),
+                                  );
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(res['mensaje'] ?? 'Error al restablecer la contraseña.'),
+                                      backgroundColor: AppColors.terracota,
+                                    ),
+                                  );
+                                }
+                              },
+                        child: cargando
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              )
+                            : const Text(
+                                'Restablecer Contraseña',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextButton(
+                        onPressed: () => setModalState(() => paso = 1),
+                        child: const Text(
+                          '¿No recibiste el código? Volver a intentar',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.moradoOscuro,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   // 2. Flujo Paciente: Ventana modal para vincular mediante Token o QR
@@ -538,11 +966,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Recuperar contraseña')),
-                      );
-                    },
+                    onPressed: _mostrarModalRecuperarPassword,
                     style: TextButton.styleFrom(
                       padding: EdgeInsets.zero,
                       minimumSize: Size.zero,

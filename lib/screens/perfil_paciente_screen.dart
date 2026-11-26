@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/perfiles_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
@@ -130,6 +131,89 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
       return 'Formato de teléfono inválido (7 a 15 dígitos)';
     }
     return null;
+  }
+
+  void _mostrarConfirmacionArchivarPaciente() {
+    if (widget.idPaciente == null || widget.idPaciente!.isEmpty) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        bool archivando = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.archive_outlined, color: AppColors.terracota, size: 26),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Archivar Paciente',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.azulOscuro,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              '¿Estás seguro de dar de baja a $_savedNombre? El paciente se desactivará de tu lista activa, pero su historial médico, tratamientos y registros de tomas se conservarán intactos de forma segura.',
+              style: const TextStyle(fontSize: 14.5, color: Color(0xFF475569), height: 1.4),
+            ),
+            actions: [
+              TextButton(
+                onPressed: archivando ? null : () => Navigator.pop(dialogCtx),
+                child: const Text('Cancelar', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.terracota,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
+                onPressed: archivando
+                    ? null
+                    : () async {
+                        setDialogState(() => archivando = true);
+                        final exito = await PacientesService.eliminarPaciente(widget.idPaciente!);
+                        if (!mounted || !dialogCtx.mounted) return;
+                        Navigator.pop(dialogCtx);
+
+                        if (exito) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Paciente archivado exitosamente. Su historial permanece seguro.'),
+                              backgroundColor: Color(0xFF2C5E53),
+                              duration: Duration(seconds: 3),
+                            ),
+                          );
+                          Navigator.pop(context, {'archivado': true});
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('No fue posible archivar al paciente. Verifica tu conexión.'),
+                              backgroundColor: AppColors.terracota,
+                            ),
+                          );
+                        }
+                      },
+                child: archivando
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Sí, archivar paciente', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _mostrarConfirmacionSobrescribirPaciente() {
@@ -724,7 +808,7 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                   const SizedBox(height: 32),
 
                   // Botón grande de edición que se divide en Cancelar y Guardar
-                  if (!_editando)
+                  if (!_editando) ...[
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.moradoOscuro,
@@ -748,8 +832,31 @@ class _PerfilPacienteScreenState extends State<PerfilPacienteScreen> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    )
-                  else
+                    ),
+                    if (widget.idPaciente != null && widget.idPaciente!.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.terracota,
+                          side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.4),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          backgroundColor: const Color(0xFFFEF2F2),
+                        ),
+                        onPressed: _mostrarConfirmacionArchivarPaciente,
+                        icon: const Icon(Icons.archive_outlined, size: 20),
+                        label: const Text(
+                          'Archivar o Dar de Baja al Paciente',
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ] else
                     Row(
                       children: [
                         Expanded(

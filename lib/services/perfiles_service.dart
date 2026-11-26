@@ -66,20 +66,18 @@ class PerfilesService {
           'urlFoto': urlFoto,
           'mensaje': data['mensaje'] ?? 'Foto actualizada exitosamente.',
         };
+      } else {
+        return {
+          'exito': false,
+          'mensaje': 'Error del servidor (${response.statusCode}) al subir la foto.',
+        };
       }
-    } catch (_) {}
-
-    // Respaldo de visualizaciÃ³n inmediata local si el servidor no responde
-    final prefs = await SharedPreferences.getInstance();
-    if (tipo == 'usuario') {
-      await prefs.setString('usuario_foto', archivo.path);
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'No se pudo subir la foto. Error de conexión con el servidor: $e',
+      };
     }
-    return {
-      'exito': true,
-      'urlFoto': archivo.path,
-      'modoSimulacion': true,
-      'mensaje': 'Foto actualizada localmente.',
-    };
   }
 
   // --------------------------------------------------------------------------
@@ -170,9 +168,6 @@ class PerfilesService {
     required String telefono,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('usuario_nombre', nombre);
-    await prefs.setString('usuario_apellidos', apellidos);
-    await prefs.setString('usuario_telefono', telefono);
 
     try {
       final response = await http
@@ -188,11 +183,19 @@ class PerfilesService {
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        return {'exito': true, 'mensaje': 'Perfil guardado con Ã©xito.'};
+        await prefs.setString('usuario_nombre', nombre);
+        await prefs.setString('usuario_apellidos', apellidos);
+        await prefs.setString('usuario_telefono', telefono);
+        return {'exito': true, 'mensaje': 'Perfil guardado con éxito.'};
       }
-    } catch (_) {}
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'Error de conexión al actualizar perfil: $e',
+      };
+    }
 
-    return {'exito': true, 'mensaje': 'Perfil guardado localmente.'};
+    return {'exito': false, 'mensaje': 'No se pudo actualizar el perfil en el servidor.'};
   }
 
   // --------------------------------------------------------------------------

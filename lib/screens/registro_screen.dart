@@ -67,6 +67,40 @@ class _RegistroScreenState extends State<RegistroScreen> {
     setState(() => _isLoading = false);
 
     if (res['exito'] == true) {
+      final bool requiereConfirmacion = res['requiereConfirmacion'] == true;
+
+      if (requiereConfirmacion) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text(
+              'Confirma tu correo electrónico',
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.moradoOscuro),
+            ),
+            content: Text(
+              'Hemos registrado tu cuenta con éxito. Se ha enviado un enlace de confirmación a ${_emailController.text.trim()}.\n\nPor favor revisa tu bandeja de entrada o spam y confirma tu correo antes de iniciar sesión.',
+              style: const TextStyle(fontSize: 14.5, color: Color(0xFF4A5568)),
+            ),
+            actions: [
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.moradoOscuro,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(dialogCtx);
+                  Navigator.pop(context);
+                },
+                child: const Text('Entendido, ir al inicio', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -75,7 +109,7 @@ class _RegistroScreenState extends State<RegistroScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  '¡Cuenta creada exitosamente! Bienvenido, ${_nombreController.text.trim()}.',
+                  'Cuenta creada exitosamente. Bienvenido, ${_nombreController.text.trim()}.',
                 ),
               ),
             ],

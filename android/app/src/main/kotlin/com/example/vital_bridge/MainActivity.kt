@@ -206,6 +206,22 @@ class MainActivity : FlutterActivity() {
                         result.error("URL_VACIA", "La URL está vacía", null)
                     }
                 }
+                "iniciarLlamada" -> {
+                    val telefono = call.argument<String>("telefono")
+                    if (!telefono.isNullOrEmpty()) {
+                        try {
+                            val callIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:$telefono")).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(callIntent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("ERROR_LLAMADA", e.message, null)
+                        }
+                    } else {
+                        result.error("TELEFONO_VACIO", "El número de teléfono está vacío", null)
+                    }
+                }
                 "verificarPermisoAlarmasExactas" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager

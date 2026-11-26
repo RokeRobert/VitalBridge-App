@@ -33,6 +33,9 @@ class ApiConstants {
   static String get loginCuidador => '$baseUrl/auth/login';
   static String get registroCuidador => '$baseUrl/auth/registro';
   static String get loginPacienteToken => '$baseUrl/auth/paciente/token';
+  static String get recuperarPassword => '$baseUrl/auth/recuperar-password';
+  static String get restablecerPassword => '$baseUrl/auth/restablecer-password';
+  static String get reenviarConfirmacion => '$baseUrl/auth/reenviar-confirmacion';
 
   // --- Endpoints de Pacientes (/api/pacientes) ---
   static String get pacientePerfil => '$baseUrl/pacientes';

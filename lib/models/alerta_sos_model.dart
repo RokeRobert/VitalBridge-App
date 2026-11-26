@@ -4,6 +4,7 @@ class AlertaSosModel {
   final int id;
   final String idPaciente;
   final String? nombrePaciente;
+  final String? telefono;
   final DateTime fechaCreacion;
   final int idEstadoAlerta; // 1: Activa, 2: Atendida, 3: Falsa Alarma
   final String estado;
@@ -14,6 +15,7 @@ class AlertaSosModel {
     required this.id,
     required this.idPaciente,
     this.nombrePaciente,
+    this.telefono,
     required this.fechaCreacion,
     this.idEstadoAlerta = 1,
     this.estado = 'Activa',
@@ -54,6 +56,9 @@ class AlertaSosModel {
       nombrePaciente: (json['nombrePaciente'] ??
               (json['paciente'] is Map ? json['paciente']['nombrePaciente'] : null))
           ?.toString(),
+      telefono: (json['telefono'] ??
+              (json['paciente'] is Map ? json['paciente']['telefono'] : null))
+          ?.toString(),
       fechaCreacion: _parseUtc(json['fechaCreacion'] ?? json['fecha_creacion']),
       idEstadoAlerta: int.tryParse((json['idEstadoAlerta'] ?? json['id_estado_alerta'] ?? 1).toString()) ?? 1,
       estado: (json['estado'] ??
@@ -70,6 +75,7 @@ class AlertaSosModel {
       if (id > 0) 'idAlerta': id,
       'idPaciente': idPaciente,
       if (nombrePaciente != null) 'nombrePaciente': nombrePaciente,
+      if (telefono != null) 'telefono': telefono,
       'fechaCreacion': fechaCreacion.toUtc().toIso8601String(),
       'idEstadoAlerta': idEstadoAlerta,
       'estado': estado,

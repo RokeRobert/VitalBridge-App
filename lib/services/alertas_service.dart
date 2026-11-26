@@ -190,10 +190,8 @@ class AlertasService {
         final List data = jsonDecode(response.body);
         return data.map((item) => AlertaSosModel.fromJson(item)).toList();
       }
-    } catch (_) {
-      // Modo desarrollo
-    }
-    return _alertasSimuladas.where((a) => a.esActiva).toList();
+    } catch (_) {}
+    return [];
   }
 
   /// Marca una alerta como atendida o resuelta

@@ -42,12 +42,14 @@ void main() async {
       final latitud = double.tryParse(payloadAlarma['latitud']?.toString() ?? '');
       final longitud = double.tryParse(payloadAlarma['longitud']?.toString() ?? '');
       final nombrePaciente = payloadAlarma['nombrePaciente']?.toString() ?? 'Paciente';
+      final telefono = payloadAlarma['telefono']?.toString();
 
       FcmService.alertaSosAbierta = true;
       AlarmasNativasService.cancelarNotificacionSos();
       pantallaInicial = AlertaSosCuidadorScreen(
         nombrePaciente: nombrePaciente,
         idPaciente: idPaciente,
+        telefono: telefono,
         idAlerta: idAlerta,
         latitud: latitud,
         longitud: longitud,

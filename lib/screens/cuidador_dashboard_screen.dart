@@ -197,12 +197,19 @@ class _CuidadorDashboardScreenState extends State<CuidadorDashboardScreen> with 
               ),
               onPressed: () {
                 Navigator.pop(dialogCtx);
+                PacienteModel? paciente;
+                try {
+                  paciente = _pacientes.firstWhere((p) => p.id == masReciente.idPaciente);
+                } catch (_) {}
+
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (context) => AlertaSosCuidadorScreen(
                       idAlerta: masReciente.id,
-                      nombrePaciente: masReciente.nombrePaciente ?? 'Paciente',
+                      nombrePaciente: masReciente.nombrePaciente ?? paciente?.nombreCompleto ?? 'Paciente',
                       idPaciente: masReciente.idPaciente,
+                      telefono: masReciente.telefono ?? paciente?.telefono,
+                      parentesco: paciente?.parentesco ?? 'Familiar',
                       latitud: masReciente.latitud,
                       longitud: masReciente.longitud,
                       horaAlerta: masReciente.horaLegible,

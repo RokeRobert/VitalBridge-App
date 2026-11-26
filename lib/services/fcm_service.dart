@@ -160,12 +160,14 @@ class FcmService {
     final latitud = double.tryParse(data['latitud']?.toString() ?? '');
     final longitud = double.tryParse(data['longitud']?.toString() ?? '');
     final nombrePaciente = data['nombrePaciente']?.toString() ?? 'Paciente';
+    final telefono = data['telefono']?.toString();
 
     AlarmasNativasService.navigatorKey.currentState?.push(
       MaterialPageRoute(
         builder: (_) => AlertaSosCuidadorScreen(
           nombrePaciente: nombrePaciente,
           idPaciente: idPaciente,
+          telefono: telefono,
           idAlerta: idAlerta,
           latitud: latitud,
           longitud: longitud,

@@ -6,13 +6,14 @@ import 'package:vital_bridge/screens/cuidador_dashboard_screen.dart';
 import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
 import 'package:vital_bridge/services/fcm_service.dart';
+import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/theme/app_colors.dart';
 
 class AlertaSosCuidadorScreen extends StatefulWidget {
   final String nombrePaciente;
   final String idPaciente;
   final String parentesco;
-  final String telefono;
+  final String? telefono;
   final String horaAlerta;
   final int? idAlerta;
   final double? latitud;
@@ -20,11 +21,11 @@ class AlertaSosCuidadorScreen extends StatefulWidget {
 
   const AlertaSosCuidadorScreen({
     super.key,
-    this.nombrePaciente = 'Roberto Gómez',
-    this.idPaciente = '0045',
-    this.parentesco = 'Padre',
-    this.telefono = '+34 610 345 872',
-    this.horaAlerta = '10:45 AM',
+    this.nombrePaciente = 'Paciente',
+    this.idPaciente = '',
+    this.parentesco = 'Familiar',
+    this.telefono,
+    this.horaAlerta = 'Ahora',
     this.idAlerta,
     this.latitud,
     this.longitud,
@@ -39,13 +40,44 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
   Timer? _vibracionTimer;
   bool _sirenaActiva = true;
 
+  late String _nombrePaciente;
+  late String _idPaciente;
+  late String _parentesco;
+  late String _telefono;
+
   @override
   void initState() {
     super.initState();
+    _nombrePaciente = widget.nombrePaciente;
+    _idPaciente = widget.idPaciente;
+    _parentesco = widget.parentesco;
+    _telefono = widget.telefono?.trim() ?? '';
+
     FcmService.alertaSosAbierta = true;
     AlarmasNativasService.cancelarNotificacionSos();
     _audioPlayer = AudioPlayer();
     _iniciarSirena();
+    _resolverDatosPaciente();
+  }
+
+  Future<void> _resolverDatosPaciente() async {
+    if (_idPaciente.isEmpty) return;
+    try {
+      final paciente = await PacientesService.obtenerPacientePorId(_idPaciente);
+      if (paciente != null && mounted) {
+        setState(() {
+          if (_telefono.isEmpty && paciente.telefono.isNotEmpty) {
+            _telefono = paciente.telefono.trim();
+          }
+          if ((_nombrePaciente == 'Paciente' || _nombrePaciente.isEmpty) && paciente.nombreCompleto.isNotEmpty) {
+            _nombrePaciente = paciente.nombreCompleto;
+          }
+          if (paciente.parentesco.isNotEmpty) {
+            _parentesco = paciente.parentesco;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -105,8 +137,8 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
       await AlertasService.resolverAlerta(
         widget.idAlerta!,
         resolucion: 'Atendida',
-        idPaciente: widget.idPaciente,
-        nombrePaciente: widget.nombrePaciente,
+        idPaciente: _idPaciente,
+        nombrePaciente: _nombrePaciente,
         latitud: widget.latitud,
         longitud: widget.longitud,
       );
@@ -139,16 +171,33 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
 
   Future<void> _llamarPaciente() async {
     _detenerSirena();
-    final telefonoOriginal = widget.telefono.trim();
-    final telefonoLimpio = telefonoOriginal.replaceAll(RegExp(r'[^\d+]'), '');
+
+    var telefonoTarget = _telefono.trim();
+
+    // Si aún no tenemos el teléfono, consultar el paciente en tiempo real
+    if (telefonoTarget.isEmpty && _idPaciente.isNotEmpty) {
+      final paciente = await PacientesService.obtenerPacientePorId(_idPaciente);
+      if (paciente != null && paciente.telefono.isNotEmpty) {
+        telefonoTarget = paciente.telefono.trim();
+        if (mounted) {
+          setState(() {
+            _telefono = telefonoTarget;
+          });
+        }
+      }
+    }
+
+    final telefonoLimpio = telefonoTarget.replaceAll(RegExp(r'[^\d+]'), '');
 
     if (telefonoLimpio.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('El paciente no tiene un número telefónico válido registrado.'),
-          backgroundColor: AppColors.terracota,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El paciente no tiene un número telefónico registrado en su perfil.'),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+      }
       return;
     }
 
@@ -350,6 +399,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
     required Color color,
     required IconData icono,
     required String texto,
+    String? subtexto,
     required VoidCallback onTap,
   }) {
     return Material(
@@ -383,14 +433,31 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
               ),
               const SizedBox(width: 14),
               Expanded(
-                child: Text(
-                  texto,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.2,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      texto,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    if (subtexto != null && subtexto.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtexto,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               const Icon(
@@ -559,7 +626,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
 
                 // Nombre del paciente
                 Text(
-                  widget.nombrePaciente,
+                  _nombrePaciente,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     fontSize: 24,
@@ -580,7 +647,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      'Adulto Mayor • ID: ${widget.idPaciente}',
+                      '$_parentesco${_idPaciente.isNotEmpty ? ' • ID: $_idPaciente' : ''}',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -762,6 +829,7 @@ class _AlertaSosCuidadorScreenState extends State<AlertaSosCuidadorScreen> {
                         color: const Color(0xFFE25C54),
                         icono: Icons.phone_rounded,
                         texto: 'Llamar inmediatamente',
+                        subtexto: _telefono.isNotEmpty ? _telefono : null,
                         onTap: _llamarPaciente,
                       ),
                       const SizedBox(height: 12),

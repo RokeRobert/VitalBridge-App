@@ -39,13 +39,19 @@ class PacientesService {
 
   /// Obtiene un paciente específico por su ID desde la lista en memoria o caché
   static Future<PacienteModel?> obtenerPacientePorId(String idPaciente) async {
+    if (idPaciente.isEmpty) return null;
     if (_pacientesEnMemoria.isEmpty) {
       await obtenerPacientes();
     }
     try {
       return _pacientesEnMemoria.firstWhere((p) => p.id == idPaciente);
     } catch (_) {
-      return null;
+      try {
+        final fresca = await obtenerPacientes();
+        return fresca.firstWhere((p) => p.id == idPaciente);
+      } catch (_) {
+        return null;
+      }
     }
   }
 

@@ -36,6 +36,7 @@ class ApiConstants {
   static String get recuperarPassword => '$baseUrl/auth/recuperar-password';
   static String get restablecerPassword => '$baseUrl/auth/restablecer-password';
   static String get reenviarConfirmacion => '$baseUrl/auth/reenviar-confirmacion';
+  static String get googleSync => '$baseUrl/auth/google-sync';
 
   // --- Endpoints de Pacientes (/api/pacientes) ---
   static String get pacientePerfil => '$baseUrl/pacientes';

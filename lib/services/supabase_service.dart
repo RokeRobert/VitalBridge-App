@@ -22,12 +22,12 @@ class SupabaseService {
       _inicializado = true;
       if (kDebugMode) {
         // ignore: avoid_print
-        print('✅ Supabase Realtime inicializado correctamente.');
+        print('Supabase Realtime inicializado correctamente.');
       }
     } catch (e) {
       if (kDebugMode) {
         // ignore: avoid_print
-        print('⚠️ Aviso: Supabase inicialización diferida o sin red: $e');
+        print('Aviso: Supabase inicializacion diferida o sin red: $e');
       }
     }
   }

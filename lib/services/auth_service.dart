@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_bridge/models/paciente_model.dart';
 import 'package:vital_bridge/models/usuario_model.dart';
 import 'package:vital_bridge/services/api_constants.dart';
@@ -326,6 +328,101 @@ class AuthService {
       return {
         'exito': false,
         'mensaje': 'Error de conexión al reenviar confirmación: $e',
+      };
+    }
+  }
+
+  /// Inicia sesión o registra al Cuidador mediante Google Sign-In
+  static Future<Map<String, dynamic>> iniciarSesionConGoogle() async {
+    try {
+      final googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+
+      final googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        return {'exito': false, 'mensaje': 'Inicio de sesión con Google cancelado.'};
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken == null) {
+        return {
+          'exito': false,
+          'mensaje': 'No fue posible obtener las credenciales de Google.',
+        };
+      }
+
+      final supabase = Supabase.instance.client;
+      final authResponse = await supabase.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: accessToken,
+      );
+
+      final session = authResponse.session;
+      final user = authResponse.user;
+
+      if (session == null || user == null) {
+        return {
+          'exito': false,
+          'mensaje': 'No se pudo vincular la cuenta de Google con Supabase.',
+        };
+      }
+
+      final fullName = googleUser.displayName ?? user.userMetadata?['full_name'] ?? 'Cuidador';
+      final partes = fullName.trim().split(' ');
+      final nombre = partes.isNotEmpty ? partes.first : 'Cuidador';
+      final apellidos = partes.length > 1 ? partes.sublist(1).join(' ') : '';
+      final correo = user.email ?? googleUser.email;
+      final foto = googleUser.photoUrl ?? user.userMetadata?['avatar_url']?.toString();
+
+      final prefs = await SharedPreferences.getInstance();
+      await _limpiarCachesLocales(prefs);
+
+      await prefs.setString(_keyToken, session.accessToken);
+      await prefs.setString(_keyUsuarioId, user.id);
+      await prefs.setString(_keyRol, 'cuidador');
+      await prefs.setString('usuario_nombre', nombre);
+      await prefs.setString('usuario_apellidos', apellidos);
+      await prefs.setString('usuario_correo', correo);
+      await prefs.setString('usuario_telefono', '');
+      if (foto != null && foto.isNotEmpty) {
+        await prefs.setString('usuario_foto', foto);
+      }
+
+      // Sincronizar usuario en la base de datos relacional de PostgreSQL
+      try {
+        await http.post(
+          Uri.parse(ApiConstants.googleSync),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'idUsuario': user.id,
+            'correo': correo,
+            'nombre': nombre,
+            'apellidos': apellidos,
+            'foto': foto,
+          }),
+        ).timeout(const Duration(seconds: 6));
+      } catch (_) {}
+
+      final usuario = UsuarioModel(
+        id: user.id,
+        nombre: nombre,
+        apellidos: apellidos,
+        correo: correo,
+        telefono: '',
+        foto: foto,
+        token: session.accessToken,
+      );
+
+      return {'exito': true, 'usuario': usuario};
+    } catch (e) {
+      return {
+        'exito': false,
+        'mensaje': 'Error al iniciar sesión con Google: $e',
       };
     }
   }

@@ -22,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _tokenController = TextEditingController();
   bool _obscurePassword = true;
   bool _cargandoCuidador = false;
+  bool _cargandoGoogle = false;
 
   @override
   void initState() {
@@ -109,6 +110,51 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) {
         setState(() => _cargandoCuidador = false);
+      }
+    }
+  }
+
+  // Flujo Cuidador: Iniciar sesión o registrarse con Google
+  Future<void> _iniciarSesionConGoogle() async {
+    if (_cargandoGoogle) return;
+
+    setState(() => _cargandoGoogle = true);
+
+    try {
+      final res = await AuthService.iniciarSesionConGoogle();
+      if (!mounted) return;
+
+      if (res['exito'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sesión iniciada con Google exitosamente.'),
+            backgroundColor: Color(0xFF336C60),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        FcmService.sincronizarTokenCuidador();
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const CuidadorDashboardScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res['mensaje'] ?? 'Error al iniciar con Google.'),
+            backgroundColor: AppColors.terracota,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al conectar con Google: $e'),
+          backgroundColor: AppColors.terracota,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _cargandoGoogle = false);
       }
     }
   }
@@ -1040,6 +1086,84 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Color(0xFF1E3F38),
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+
+                // Separador "O CONTINUAR CON"
+                Row(
+                  children: [
+                    Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                      child: Text(
+                        'O CONTINUAR CON',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[500],
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ),
+                    Expanded(child: Divider(color: Colors.grey[300], thickness: 1)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+
+                // Botón Continuar con Google
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.4),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    elevation: 0,
+                  ),
+                  onPressed: _cargandoGoogle ? null : _iniciarSesionConGoogle,
+                  child: _cargandoGoogle
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF5E5482),
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF4285F4),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'G',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 15,
+                                    fontFamily: 'sans-serif',
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Continuar con Google',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
+                              ),
+                            ),
+                          ],
+                        ),
                 ),
                 const SizedBox(height: 24),
 

@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vital_bridge/models/paciente_model.dart';
 import 'package:vital_bridge/models/usuario_model.dart';
+import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/api_constants.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
@@ -175,11 +176,15 @@ class AuthService {
         final paciente = PacienteModel.fromJson(data['paciente'] ?? data);
 
         final prefs = await SharedPreferences.getInstance();
+        await _limpiarCachesLocales(prefs);
         await prefs.setString(_keyToken, token);
         await prefs.setString(_keyUsuarioId, paciente.id);
         await prefs.setString(_keyRol, 'paciente');
         await prefs.setString('usuario_nombre', paciente.nombre);
         await prefs.setString('usuario_apellidos', paciente.apellidos);
+        await prefs.remove('usuario_correo');
+        await prefs.remove('usuario_telefono');
+        await prefs.remove('usuario_foto');
 
         return {'exito': true, 'paciente': paciente};
       } else {
@@ -207,7 +212,7 @@ class AuthService {
     await _limpiarCachesLocales(prefs);
   }
 
-  /// Limpia cachés en disco y memoria volátil
+  /// Limpia cachés en disco, memoria volátil y alarmas nativas programadas
   static Future<void> _limpiarCachesLocales(SharedPreferences prefs) async {
     final keys = prefs.getKeys().toList();
     for (var k in keys) {
@@ -217,6 +222,7 @@ class AuthService {
     }
     PacientesService.limpiarCache();
     TratamientosService.limpiarCache();
+    await AlarmasNativasService.cancelarTodasLasAlarmasProgramadas();
   }
 
   /// Obtiene el ID del usuario actual en sesión

@@ -396,6 +396,18 @@ class AlarmasNativasService {
     } catch (_) {}
   }
 
+  /// Cancela TODAS las alarmas programadas en el sistema (flutter_local_notifications + AlarmManager nativo).
+  /// Debe invocarse al cerrar sesión, cambiar de paciente o antes de resincronizar las tomas del día.
+  static Future<void> cancelarTodasLasAlarmasProgramadas() async {
+    try {
+      await _notifications.cancelAll();
+    } catch (_) {}
+    try {
+      await _channelPermisos.invokeMethod('cancelarTodasLasAlarmasNativas');
+      debugPrint('AlarmasNativas: Todas las alarmas programadas nativas fueron canceladas.');
+    } catch (_) {}
+  }
+
   /// Cancela específicamente la notificación de alerta SOS de alta prioridad (id 9999)
   static Future<void> cancelarNotificacionSos() async {
     try {
@@ -404,13 +416,12 @@ class AlarmasNativasService {
     await cancelarTodasLasNotificacionesActivas();
   }
 
-  /// Sincroniza todas las tomas del día: programa las pendientes y cancela las tomadas
+  /// Sincroniza todas las tomas del día: limpia alarmas previas/huérfanas y programa solo las pendientes
   static Future<void> sincronizarAlarmasDelDia(List<TomaModel> tomas) async {
     debugPrint('AlarmasNativas: Sincronizando ${tomas.length} tomas del día...');
+    await cancelarTodasLasAlarmasProgramadas();
     for (final toma in tomas) {
-      if (toma.esTomada) {
-        await cancelarAlarma(toma.idHorario);
-      } else {
+      if (!toma.esTomada) {
         await programarAlarmaParaToma(toma);
       }
     }

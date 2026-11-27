@@ -157,6 +157,7 @@ class MainActivity : FlutterActivity() {
                                 )
                                 val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTimeMillis, pendingIntent)
                                 alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                                guardarIdAlarmaNativa(idHorario)
                                 Log.i("MainActivity", "Alarma nativa programada para idHorario $idHorario")
                             }
                             result.success(true)
@@ -171,22 +172,8 @@ class MainActivity : FlutterActivity() {
                 "cancelarAlarmaNativa" -> {
                     val idHorario = call.argument<Int>("idHorario") ?: 0
                     if (idHorario > 0) {
-                        try {
-                            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
-                            if (alarmManager != null) {
-                                val alarmIntent = Intent(this, AlarmaReceiver::class.java).apply {
-                                    action = "com.example.vital_bridge.ALARM_TRIGGER"
-                                }
-                                val pendingIntent = PendingIntent.getBroadcast(
-                                    this,
-                                    idHorario,
-                                    alarmIntent,
-                                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                                )
-                                alarmManager.cancel(pendingIntent)
-                                Log.i("MainActivity", "Alarma nativa cancelada para idHorario $idHorario")
-                            }
-                        } catch (_: Exception) {}
+                        cancelarAlarmaPorId(idHorario)
+                        eliminarIdAlarmaNativa(idHorario)
                     }
                     result.success(true)
                 }
@@ -312,6 +299,10 @@ class MainActivity : FlutterActivity() {
                     } catch (_: Exception) {}
                     result.success(true)
                 }
+                "cancelarTodasLasAlarmasNativas" -> {
+                    cancelarTodasLasAlarmasNativas()
+                    result.success(true)
+                }
                 "cerrarPantallaAlarma" -> {
                     ultimoPayload = null
                     try {
@@ -335,5 +326,56 @@ class MainActivity : FlutterActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun guardarIdAlarmaNativa(idHorario: Int) {
+        val prefs = getSharedPreferences("vital_bridge_native_alarms", Context.MODE_PRIVATE)
+        val actuales = HashSet(prefs.getStringSet("scheduled_alarm_ids", emptySet()) ?: emptySet())
+        actuales.add(idHorario.toString())
+        prefs.edit().putStringSet("scheduled_alarm_ids", actuales).apply()
+    }
+
+    private fun eliminarIdAlarmaNativa(idHorario: Int) {
+        val prefs = getSharedPreferences("vital_bridge_native_alarms", Context.MODE_PRIVATE)
+        val actuales = HashSet(prefs.getStringSet("scheduled_alarm_ids", emptySet()) ?: emptySet())
+        if (actuales.remove(idHorario.toString())) {
+            prefs.edit().putStringSet("scheduled_alarm_ids", actuales).apply()
+        }
+    }
+
+    private fun cancelarAlarmaPorId(idHorario: Int) {
+        try {
+            val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return
+            val alarmIntent = Intent(this, AlarmaReceiver::class.java).apply {
+                action = "com.example.vital_bridge.ALARM_TRIGGER"
+            }
+            val pendingIntent = PendingIntent.getBroadcast(
+                this,
+                idHorario,
+                alarmIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            alarmManager.cancel(pendingIntent)
+            pendingIntent.cancel()
+            Log.i("MainActivity", "Alarma nativa cancelada para idHorario $idHorario")
+        } catch (_: Exception) {}
+    }
+
+    private fun cancelarTodasLasAlarmasNativas() {
+        val prefs = getSharedPreferences("vital_bridge_native_alarms", Context.MODE_PRIVATE)
+        val actuales = prefs.getStringSet("scheduled_alarm_ids", emptySet()) ?: emptySet()
+        for (idStr in actuales) {
+            val idHorario = idStr.toIntOrNull()
+            if (idHorario != null && idHorario > 0) {
+                cancelarAlarmaPorId(idHorario)
+            }
+        }
+        prefs.edit().remove("scheduled_alarm_ids").apply()
+        try {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            notificationManager?.cancelAll()
+        } catch (_: Exception) {}
+        ultimoPayload = null
+        Log.i("MainActivity", "Todas las alarmas nativas programadas fueron canceladas (${actuales.size} ids).")
     }
 }

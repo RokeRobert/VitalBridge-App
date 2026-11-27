@@ -266,6 +266,26 @@ class AlertasService {
     }
   }
 
+  /// Registra el token FCM del dispositivo del paciente en el backend
+  static Future<bool> registrarTokenFcmPaciente(String token, String idPaciente) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse(ApiConstants.registrarFcmTokenPaciente),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'token': token,
+              'idPaciente': idPaciente,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static void _marcarAlertaResuelta(
     int idAlerta,
     String resolucion, {

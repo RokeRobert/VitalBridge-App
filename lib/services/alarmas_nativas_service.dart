@@ -97,6 +97,36 @@ class AlarmasNativasService {
     }
   }
 
+  /// Inicialización ligera para isolates en segundo plano (sin Activity / MethodChannel).
+  /// Permite que FCM despierte la app cerrada y reprograme alarmas con AlarmManager vía flutter_local_notifications.
+  static Future<void> inicializarParaSegundoPlano() async {
+    tz.initializeTimeZones();
+    try {
+      final tzInfo = await FlutterTimezone.getLocalTimezone();
+      tz.setLocalLocation(tz.getLocation(tzInfo.identifier));
+    } catch (_) {
+      try {
+        final offset = DateTime.now().timeZoneOffset;
+        for (final loc in tz.timeZoneDatabase.locations.values) {
+          if (loc.currentTimeZone.offset == offset) {
+            tz.setLocalLocation(loc);
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+    );
+    await _notifications.initialize(
+      settings: initSettings,
+      onDidReceiveBackgroundNotificationResponse: notificationTapBackground,
+    );
+  }
+
   /// Manejador de evento cuando el usuario interactúa con la notificación o Android dispara el intent
   static void _alRecibirNotificacion(NotificationResponse response) {
     final payload = response.payload;

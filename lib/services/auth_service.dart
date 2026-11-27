@@ -7,6 +7,7 @@ import 'package:vital_bridge/models/paciente_model.dart';
 import 'package:vital_bridge/models/usuario_model.dart';
 import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/api_constants.dart';
+import 'package:vital_bridge/services/fcm_service.dart';
 import 'package:vital_bridge/services/pacientes_service.dart';
 import 'package:vital_bridge/services/tratamientos_service.dart';
 
@@ -185,6 +186,9 @@ class AuthService {
         await prefs.remove('usuario_correo');
         await prefs.remove('usuario_telefono');
         await prefs.remove('usuario_foto');
+
+        // Registrar el token FCM de este dispositivo para recibir sincronizaciones silenciosas del cuidador
+        await FcmService.sincronizarTokenDispositivo();
 
         return {'exito': true, 'paciente': paciente};
       } else {

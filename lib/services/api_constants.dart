@@ -55,6 +55,7 @@ class ApiConstants {
   static String get alertasHistorial => '$baseUrl/alertas/historial';
   static String get resolverAlerta => '$baseUrl/alertas/resolver';
   static String get registrarFcmToken => '$baseUrl/alertas/fcm-token';
+  static String get registrarFcmTokenPaciente => '$baseUrl/alertas/fcm-token-paciente';
 
   // --- Endpoints de Perfiles y Almacenamiento de Fotos (/api/perfiles) ---
   static String get subirFotoPerfil => '$baseUrl/perfiles/foto';

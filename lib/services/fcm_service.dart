@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vital_bridge/screens/alerta_sos_cuidador_screen.dart';
 import 'package:vital_bridge/services/alarmas_nativas_service.dart';
 import 'package:vital_bridge/services/alertas_service.dart';
+import 'package:vital_bridge/services/tratamientos_service.dart';
 
 /// Manejador de mensajes en segundo plano / app cerrada (Top-Level Function)
 @pragma('vm:entry-point')
@@ -67,6 +68,23 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       notificationDetails: NotificationDetails(android: androidDetails),
       payload: jsonEncode(data),
     );
+  } else if (data['tipo'] == 'SYNC_TRATAMIENTOS') {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rol = prefs.getString('auth_rol');
+      final idPacienteLocal = prefs.getString('auth_user_id') ?? '';
+      final idPacientePush = data['idPaciente']?.toString() ?? '';
+
+      if (rol == 'paciente' &&
+          idPacienteLocal.isNotEmpty &&
+          (idPacientePush.isEmpty || idPacientePush == idPacienteLocal)) {
+        await AlarmasNativasService.inicializarParaSegundoPlano();
+        final tomas = await TratamientosService.obtenerTomasHoy(pacienteId: idPacienteLocal);
+        await AlarmasNativasService.sincronizarAlarmasDelDia(tomas);
+      }
+    } catch (e) {
+      debugPrint('FcmService (background): Error sincronizando tratamientos: $e');
+    }
   }
 }
 
@@ -86,8 +104,11 @@ class FcmService {
       );
     } catch (_) {}
 
-    // 2. Registrar el token del dispositivo si la sesión es de cuidador
-    await sincronizarTokenCuidador();
+    // 1.1 Crear canal estándar para avisos de tomas omitidas (sin sirena de emergencia)
+    await _crearCanalAvisosTomas();
+
+    // 2. Registrar el token del dispositivo (cuidador o paciente)
+    await sincronizarTokenDispositivo();
 
     // 3. Escuchar actualizaciones periódicas de token FCM
     _messaging.onTokenRefresh.listen((nuevoToken) async {
@@ -95,10 +116,14 @@ class FcmService {
     });
 
     // 4. Oyente de mensajes cuando la aplicación está en primer plano
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
       final data = message.data;
       if (data['tipo'] == 'SOS') {
         abrirPantallaAlertaSos(data);
+      } else if (data['tipo'] == 'SYNC_TRATAMIENTOS') {
+        await _sincronizarTratamientosPaciente(data);
+      } else if (data['tipo'] == 'TOMA_OMITIDA') {
+        await _mostrarNotificacionTomaOmitida(message);
       }
     });
 
@@ -111,6 +136,72 @@ class FcmService {
     });
   }
 
+  static Future<void> _crearCanalAvisosTomas() async {
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      final androidPlugin = plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin != null) {
+        const canal = AndroidNotificationChannel(
+          'vitalbridge_avisos_tomas_v1',
+          'Avisos de Tomas Pendientes',
+          description: 'Notifica al cuidador cuando un paciente no confirma su medicamento tras 15 minutos',
+          importance: Importance.high,
+          playSound: true,
+        );
+        await androidPlugin.createNotificationChannel(canal);
+      }
+    } catch (_) {}
+  }
+
+  static Future<void> _sincronizarTratamientosPaciente(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rol = prefs.getString('auth_rol');
+      final idPacienteLocal = prefs.getString('auth_user_id') ?? '';
+      final idPacientePush = data['idPaciente']?.toString() ?? '';
+
+      if (rol == 'paciente' &&
+          idPacienteLocal.isNotEmpty &&
+          (idPacientePush.isEmpty || idPacientePush == idPacienteLocal)) {
+        final tomas = await TratamientosService.obtenerTomasHoy(pacienteId: idPacienteLocal);
+        await AlarmasNativasService.sincronizarAlarmasDelDia(tomas);
+      }
+    } catch (e) {
+      debugPrint('FcmService: Error sincronizando tratamientos en primer plano: $e');
+    }
+  }
+
+  static Future<void> _mostrarNotificacionTomaOmitida(RemoteMessage message) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getString('auth_rol') != 'cuidador') return;
+
+      final data = message.data;
+      final titulo = message.notification?.title ?? data['titulo']?.toString() ?? 'Toma pendiente sin confirmar';
+      final cuerpo = message.notification?.body ?? data['cuerpo']?.toString() ?? 'El paciente no ha confirmado su dosis.';
+      final idHorario = int.tryParse(data['idHorario']?.toString() ?? '') ??
+          DateTime.now().millisecondsSinceEpoch.remainder(100000);
+
+      final plugin = FlutterLocalNotificationsPlugin();
+      const androidDetails = AndroidNotificationDetails(
+        'vitalbridge_avisos_tomas_v1',
+        'Avisos de Tomas Pendientes',
+        channelDescription: 'Notifica al cuidador cuando un paciente no confirma su medicamento tras 15 minutos',
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+      );
+
+      await plugin.show(
+        id: 20000 + idHorario,
+        title: titulo,
+        body: cuerpo,
+        notificationDetails: const NotificationDetails(android: androidDetails),
+      );
+    } catch (_) {}
+  }
+
   /// Verifica si la aplicación fue abierta al pulsar una notificación push SOS mientras estaba cerrada
   static Future<void> verificarLanzamientoSos() async {
     try {
@@ -121,12 +212,12 @@ class FcmService {
     } catch (_) {}
   }
 
-  /// Obtiene el token FCM y lo registra en el backend si el usuario es cuidador
-  static Future<void> sincronizarTokenCuidador() async {
+  /// Obtiene el token FCM y lo registra en el backend según el rol activo (cuidador o paciente)
+  static Future<void> sincronizarTokenDispositivo() async {
     final prefs = await SharedPreferences.getInstance();
     final rol = prefs.getString('auth_rol');
 
-    if (rol == 'cuidador') {
+    if (rol == 'cuidador' || rol == 'paciente') {
       try {
         final token = await _messaging.getToken();
         if (token != null && token.isNotEmpty) {
@@ -136,10 +227,20 @@ class FcmService {
     }
   }
 
+  /// Alias compatible para registrar el token FCM del cuidador
+  static Future<void> sincronizarTokenCuidador() => sincronizarTokenDispositivo();
+
   static Future<void> _guardarYEnviarToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('fcm_token', token);
-    await AlertasService.registrarTokenFcm(token);
+    final rol = prefs.getString('auth_rol');
+    final userId = prefs.getString('auth_user_id') ?? '';
+
+    if (rol == 'paciente' && userId.isNotEmpty) {
+      await AlertasService.registrarTokenFcmPaciente(token, userId);
+    } else if (rol == 'cuidador') {
+      await AlertasService.registrarTokenFcm(token);
+    }
   }
 
   /// Navega de inmediato a la pantalla de emergencia SOS en pantalla completa
